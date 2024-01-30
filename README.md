@@ -1,5 +1,25 @@
 # GraphEmbeddings
 
+
+## Setting up the project
+First create a virtual environment and install the requirements and the project itself.
+
+```bash
+# Create virtual environment
+python -m venv venv
+# Activate 
+source venv/bin/activate # Linux
+venv\Scripts\activate # Windows
+# Install requirements make
+make requirements # make
+```
+
+> [!NOTE]
+> Alternatively you can use [Conda](https://docs.conda.io/en/latest/) to create a virtual environment.
+
+
+
+
 ## Get Data
 The data is downloaded from different sources and stored in the `data` folder.
 The data sources are defined in the `configs/config.yaml` file. Here there are either urls to the data or a specification of the [Pytorch Geometric dataset](https://pytorch-geometric.readthedocs.io/en/latest/cheatsheet/data_cheatsheet.html) to be used.
