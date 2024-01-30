@@ -1,0 +1,16 @@
+data:
+  raw_path: ./data/raw
+  adj_matrices_path: ./data/adj_matrices
+  dataset_src:
+    Cora: PyTorch-Geometric/Planetoid/Cora
+    Pubmed: PyTorch-Geometric/Planetoid/PubMed
+    Citiseer: PyTorch-Geometric/Planetoid/CiteSeer
+    Facebook: Pytorch-Geometric/AttributedGraphDataset/Facebook
+    ca-HePh:
+    p2p-Gnutella04: https://snap.stanford.edu/data/p2p-Gnutella04.html
+    BlogCatalog:
+    Wiki-Vote: https://snap.stanford.edu/data/wiki-Vote.html
+    ca-GrCq: https://snap.stanford.edu/data/ca-GrQc.html
+    Wikipedia:
+    PPI:
+
