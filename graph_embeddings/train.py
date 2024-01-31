@@ -17,8 +17,6 @@ class LPCAModel(nn.Module):
         logits = self.U @ self.V
         return logits
 
-
-
 def lpca_loss(logits, adj_s): # adj_s = shifted adj with -1's and +1's
     # loss function: eq.1  from Chanpuriya et al. (2020)
     z = logits*adj_s
@@ -38,8 +36,6 @@ rank = 32
 # Initialize model and move it to GPU
 model = LPCAModel(n_row, n_col, rank).to(device)
 
-# Define optimizer
-optimizer = optim.LBFGS(model.parameters(), lr=0.01)
 
 def closure():
     optimizer.zero_grad()
@@ -48,12 +44,32 @@ def closure():
     loss.backward()
     return loss
 
-# Training loop
-num_epochs = 1000
-for epoch in range(num_epochs):
-    # LBFGS optimizer step takes the closure function and internally calls it multiple times
-    loss = optimizer.step(closure)
 
+optim_type = 'lbfgs'
+
+if optim_type == 'adam':
+    optimizer = optim.Adam(model.parameters(), lr=0.1)
+elif optim_type == 'sgd':
+    optimizer = optim.SGD(model.parameters(), lr=0.01)
+elif optim_type == 'lbfgs':
+    optimizer = optim.LBFGS(model.parameters(), lr=0.01)
+
+num_epochs = 1000
+
+for epoch in range(1000):
+
+    if optim_type == 'lbfgs':
+        # LBFGS optimizer step takes the closure function and internally calls it multiple times
+        loss = optimizer.step(closure)
+    else: 
+        # Forward pass
+        optimizer.zero_grad()
+        logits = model.forward()  # Or simply model() if you have defined the forward method
+        loss = lpca_loss(logits, adj_s)  # Ensure lpca_loss is compatible with PyTorch and returns a scalar tensor
+        loss.backward()
+        optimizer.step()
+
+        
     if epoch % 1 == 0:
         print(f'Epoch {epoch}, Loss: {loss.item()}')
         # Compute and print the Frobenius norm for diagnostics
@@ -64,6 +80,9 @@ for epoch in range(num_epochs):
             frob_error_norm = torch.linalg.norm(clipped_logits - adj) / torch.linalg.norm(adj)
             print(f'Frobenius error: {frob_error_norm}')
 
+
 # After training, retrieve parameters
 with torch.no_grad():  # Ensure no gradients are computed in this block
     U, V = model.U.cpu().numpy(), model.V.cpu().numpy()
+
+    
