@@ -54,8 +54,8 @@ def train(adj, model, loss_funct, optim_type, num_epochs, print_loss_interval, d
             clipped_logits = torch.clip(logits, min=0, max=1)
             frob_error_norm = torch.linalg.norm(clipped_logits - adj) / torch.linalg.norm(adj)
 
-        # Break if Froebenius error is less than 1e-3
-        if frob_error_norm < 1e-3:
+        # Break if Froebenius error is less than 1e-5
+        if frob_error_norm < 1e-5:
             print(f'Epoch {epoch}, Loss: {loss.item()}, Frobenius error: {frob_error_norm}')
             break
             
@@ -66,3 +66,5 @@ def train(adj, model, loss_funct, optim_type, num_epochs, print_loss_interval, d
     # After training, retrieve parameters
     with torch.no_grad():  # Ensure no gradients are computed in this block
         U, V = model.U.cpu().numpy(), model.V.cpu().numpy()
+
+    return U, V
