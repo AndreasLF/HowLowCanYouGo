@@ -34,3 +34,6 @@ clean:
 
 datasets:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/data/make_datasets.py
+
+train:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py
