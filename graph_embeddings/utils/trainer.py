@@ -12,6 +12,22 @@ print(f'Using device: {device}')
 
 
 def train(adj, model, loss_funct, optim_type, num_epochs, print_loss_interval, device="cpu"):
+    """ Train the model using the given optimizer and loss function.
+    
+    Args:
+        adj (torch.Tensor): The adjacency matrix of the graph
+        model (torch.nn.Module): The model to train
+        loss_funct (torch.nn.Module): The loss function to use
+        optim_type (str): The optimizer to use
+        num_epochs (int): Max number of epochs to train. The training will stop early if the Frobenius error is very small
+        print_loss_interval (int): The interval at which to print the loss
+        device (str): The device to use for training
+    
+    Returns:
+        U (np.ndarray): The left singular vectors
+        V (np.ndarray): The right singular vectors
+    
+    """
 
     # shift adj matrix to -1's and +1's
     adj_s = adj*2 - 1
