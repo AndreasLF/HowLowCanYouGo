@@ -13,8 +13,8 @@ num_epochs = 1000
 print_loss_interval = 100
 # =================================================================
 
-# Ensure CUDA is available and select device
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# Ensure CUDA is available and select device, if not check for Macbook Pro support (MPS) and finally use CPU
+device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 
 # Load and prepare your data
 adj = torch.load('./data/adj_matrices/Cora.pt').to(device)
