@@ -17,7 +17,7 @@ if __name__ == '__main__':
     # ======================== Hyperparameters ========================
     optim_type = 'lbfgs'
     rank = 32
-    num_epochs = 1000
+    num_epochs = 100
     print_loss_interval = 10
     # =================================================================
 
@@ -29,5 +29,8 @@ if __name__ == '__main__':
                       threshold=10e-5, num_epochs=num_epochs, optim_type=optim_type, 
                       device=device)
     
-    # Train the model
-    trainer.train(rank, print_loss_interval)
+    # Train one model model
+    # trainer.train(rank, print_loss_interval)
+
+    # Find the optimal rank within a range
+    trainer.find_optimal_rank(1, 50)

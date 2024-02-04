@@ -11,7 +11,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.ba
 
 class Trainer:
     def __init__(self, adj, model_class, loss_funct, threshold, num_epochs, optim_type='lbfgs', device='cpu'):
-        self.adj = adj
+        self.adj = adj.to(device)
         self.model_class = model_class
         self.loss_funct = loss_funct
         self.threshold = threshold
@@ -93,6 +93,52 @@ class Trainer:
 
         # After training, retrieve parameters
         with torch.no_grad():  # Ensure no gradients are computed in this block
-            U, V = model.U.cpu().numpy(), model.V.cpu().numpy()
+            U, V = model.U, model.V
 
         return U, V
+
+    def find_optimal_rank(self, min_rank, max_rank):
+        """Find the optimal rank for the model using binary search. 
+
+        Args:
+            min_rank (int): The minimum rank
+            max_rank (int): The maximum rank
+        
+        Returns:
+            optimal_rank (int): The optimal rank
+        
+        """
+
+        lower_bound = min_rank
+        upper_bound = max_rank
+        optimal_rank = upper_bound  # Assume the worst case initially
+        thr = self.threshold
+
+        print('='*50)
+        print(f'Finding optimal rank between {min_rank} and {max_rank}')
+        print('='*50)
+
+        while lower_bound <= upper_bound:
+            current_rank = (lower_bound + upper_bound) // 2
+            print(f'Training model with rank {current_rank}')
+
+            # Set the threshold for the Frobenius error
+            thr = 10e-5
+
+            # Train the model
+            U, V = self.train(current_rank)
+
+            # Calculate the Frobenius error
+            logits = U @ V
+            frob_error = self.calc_frob_error_norm(logits, self.adj)
+
+            # Check if the reconstruction is within the threshold
+            if frob_error <= thr:
+                print(f'Full reconstruction at rank {current_rank}\n')
+                optimal_rank = current_rank  # Update the optimal rank if reconstruction is within the threshold
+                upper_bound = current_rank - 1  # Try to find a smaller rank
+            else:
+                print(f'Full reconstruction NOT found for rank {current_rank}\n')
+                lower_bound = current_rank + 1
+        print()
+        return optimal_rank
