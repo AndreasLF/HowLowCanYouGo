@@ -11,11 +11,10 @@ class L2Model(nn.Module):
         self.Y = nn.Parameter(torch.randn(rank, n_col).to(device))
         self.beta = nn.Parameter(torch.randn(1).to(device)) # scalar free parameter bias term
 
-    def reconstruct(self, model_output):
-        X,Y,beta = model_output
-        norms = torch.norm(X[:,None] - Y.T, p=2, dim=-1)
-        z = - norms + beta
-        return z
+    def reconstruct(self):
+        norms = torch.norm(self.X[:,None] - self.Y.T, p=2, dim=-1)
+        A_hat = - norms + self.beta
+        return A_hat
 
     def forward(self):
         return self.X, self.Y, self.beta

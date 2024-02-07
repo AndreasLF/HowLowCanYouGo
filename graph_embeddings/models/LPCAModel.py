@@ -10,13 +10,9 @@ class LPCAModel(nn.Module):
         self.X = nn.Parameter(torch.randn(n_row, rank).to(device))
         self.Y = nn.Parameter(torch.randn(rank, n_col).to(device))
 
-    # def reconstruct(self, model_output):
-    #     X,Y = model_output
-    #     return X @ Y
-        
-    # ! temp, before fixing Model classes interface
-    def reconstruct(self, model_output):
-        return model_output
+    def reconstruct(self):
+        A_hat = self.X @ self.Y
+        return A_hat
 
     def forward(self):
-        return self.X @ self.Y
+        return self.X, self.Y
