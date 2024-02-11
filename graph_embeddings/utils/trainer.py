@@ -1,19 +1,21 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from tqdm import tqdm
 
 from graph_embeddings.models.LPCAModel import LPCAModel
-from graph_embeddings.utils.loss import lpca_loss
+from graph_embeddings.models.L2Model import L2Model
+from graph_embeddings.utils.loss import lpca_loss, L2_loss
 
 
 # Ensure CUDA is available and select device, if not check for Macbook Pro support (MPS) and finally use CPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 
 class Trainer:
-    def __init__(self, adj, model_class, loss_funct, threshold, num_epochs, optim_type='lbfgs', device='cpu'):
+    def __init__(self, adj, model_class, loss_fn, threshold, num_epochs, optim_type='lbfgs', device='cpu'):
         self.adj = adj.to(device)
         self.model_class = model_class
-        self.loss_funct = loss_funct
+        self.loss_fn = loss_fn
         self.threshold = threshold
         self.num_epochs = num_epochs
         self.optim_type = optim_type
@@ -24,7 +26,7 @@ class Trainer:
         clipped_logits = torch.clip(logits, min=0, max=1)
         return torch.linalg.norm(clipped_logits - adj) / torch.linalg.norm(adj)
 
-    def train(self, rank, print_loss_interval=10):
+    def train(self, rank):
         """ Train the model using the given optimizer and loss function.
         
         Args:
@@ -34,11 +36,11 @@ class Trainer:
         Returns:
             U (np.ndarray): The left singular vectors
             V (np.ndarray): The right singular vectors
-        
         """
+
         adj = self.adj.to(device)
         model = self.model_class(adj.size(0), adj.size(1), rank).to(device)
-        loss_funct = self.loss_funct
+        loss_fn = self.loss_fn
         optim_type = self.optim_type
         num_epochs = self.num_epochs
 
@@ -49,8 +51,8 @@ class Trainer:
         def closure():
             """Closure function for LBFGS optimizer. This function is called internally by the optimizer."""
             optimizer.zero_grad()
-            logits = model.forward() 
-            loss = loss_funct(logits, adj_s) 
+            A_hat = model.reconstruct()
+            loss = loss_fn(A_hat, adj_s) 
             loss.backward()
             return loss
 
@@ -63,39 +65,36 @@ class Trainer:
         else:
             raise ValueError(f'Optimizer {optim_type} not supported')
 
-        for epoch in range(num_epochs):
 
-            if optim_type == 'lbfgs':
-                # LBFGS optimizer step takes the closure function and internally calls it multiple times
-                loss = optimizer.step(closure)
-            else: 
-                # Forward pass
-                optimizer.zero_grad()
-                logits = model.forward()  # Or simply model() if you have defined the forward method
-                loss = loss_funct(logits, adj_s)  # Ensure lpca_loss is compatible with PyTorch and returns a scalar tensor
-                loss.backward()
-                optimizer.step()
-
-
-            # evaluate the loss
-            with torch.no_grad():  # Ensure no gradients are computed in this block
-                logits = model.forward()
-                frob_error_norm = self.calc_frob_error_norm(logits, adj)
-
-            # Break if Froebenius error is less than 1e-7
-            if frob_error_norm < self.threshold:
-                print(f'Epoch {epoch}, Loss: {loss.item()}, Frobenius error: {frob_error_norm}')
-                break
+        with tqdm(range(num_epochs)) as pbar:
+            for epoch in pbar:
                 
-            if epoch % print_loss_interval == 0:
-                print(f'Epoch {epoch}, Loss: {loss.item()}, Frobenius error: {frob_error_norm}')
+                if optim_type == 'lbfgs':
+                    # LBFGS optimizer step takes the closure function and internally calls it multiple times
+                    loss = optimizer.step(closure)
+                else: 
+                    # Forward pass
+                    optimizer.zero_grad()
+                    A_hat = model.reconstruct() 
+                    loss = loss_fn(A_hat, adj_s)  # Ensure lpca_loss is compatible with PyTorch and returns a scalar tensor
+                    loss.backward()
+                    optimizer.step()
 
+                # Compute and print the Frobenius norm for diagnostics
+                with torch.no_grad():  # Ensure no gradients are computed in this block
+                    A_hat = model.reconstruct()
+                    frob_error_norm = self.calc_frob_error_norm(A_hat, adj)
+                    pbar.set_description(f"epoch={epoch}, loss={loss:.1f} Frobenius error: {frob_error_norm}")
+
+                # Break if Froebenius error is less than 1e-7
+                if frob_error_norm < self.threshold:
+                    pbar.close()
+                    print(f'Full reconstruction at epoch {epoch} with rank {rank}')
+                    break
 
         # After training, retrieve parameters
         with torch.no_grad():  # Ensure no gradients are computed in this block
-            U, V = model.U, model.V
-
-        return U, V
+            return model.forward()
 
     def find_optimal_rank(self, min_rank, max_rank):
         """Find the optimal rank for the model using binary search. 
