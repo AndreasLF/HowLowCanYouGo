@@ -11,7 +11,6 @@ from graph_embeddings.utils.trainer import Trainer
 # Ensure CUDA is available and select device, if not check for Macbook Pro support (MPS) and finally use CPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 print(f'Using device: {device}')
-  
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -28,7 +27,6 @@ if __name__ == '__main__':
     # parser.add_argument('--samples', type=str, default='samples.png', help='file to save samples in (default: %(default)s)')
     # parser.add_argument('--batch-size', type=int, default=32, metavar='N', help='batch size for training (default: %(default)s)')
 
-    print_loss_interval = 100
 
     args = parser.parse_args()
     print('# Options')
@@ -47,7 +45,7 @@ if __name__ == '__main__':
                       device=device)
     
     # Train one model model
-    trainer.train(args.rank, print_loss_interval)
+    trainer.train(args.rank)
 
     # Find the optimal rank within a range
     # trainer.find_optimal_rank(1, 50)
