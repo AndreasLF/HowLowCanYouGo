@@ -3,30 +3,30 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 
-from graph_embeddings.models.LPCAModel import LPCAModel
-from graph_embeddings.models.L2Model import L2Model
-from graph_embeddings.utils.loss import lpca_loss, L2_loss
-
+from graph_embeddings.utils.logger import JSONLogger
 
 # Ensure CUDA is available and select device, if not check for Macbook Pro support (MPS) and finally use CPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
 
 class Trainer:
-    def __init__(self, adj, model_class, loss_fn, threshold, num_epochs, optim_type='lbfgs', device='cpu'):
+    def __init__(self, adj, model_class, loss_fn, threshold, num_epochs, optim_type='lbfgs', max_eval=25, device='cpu', loggers=[JSONLogger], project_name='GraphEmbeddings'):
         self.adj = adj.to(device)
         self.model_class = model_class
         self.loss_fn = loss_fn
         self.threshold = threshold
         self.num_epochs = num_epochs
         self.optim_type = optim_type
+        self.max_eval = max_eval
         self.device = device
+        self.loggers = loggers
+        self.project_name = project_name
 
     def calc_frob_error_norm(self, logits, adj):
         """Compute the Frobenius error norm between the logits and the adjacency matrix."""
         clipped_logits = torch.clip(logits, min=0, max=1)
         return torch.linalg.norm(clipped_logits - adj) / torch.linalg.norm(adj)
 
-    def train(self, rank):
+    def train(self, rank, lr=0.01):
         """ Train the model using the given optimizer and loss function.
         
         Args:
@@ -45,9 +45,28 @@ class Trainer:
         num_epochs = self.num_epochs
 
 
+        # ----------- Initialize logging -----------
+        # get loss_fn function name
+        loss_fn_name = loss_fn.__name__
+        # get self.model_class function name
+        model_class_name = self.model_class.__name__
+
+        # initialize logging to all loggers
+        for logger in self.loggers:
+            logger.init(project=self.project_name, 
+                        config={'rank': rank, 
+                                'num_epochs': num_epochs, 
+                                'learning_rate': lr,
+                                'optim_type': optim_type,
+                                'loss_fn': loss_fn_name, 
+                                'model_class': model_class_name})
+
+
+        # ----------- Shift adjacency matrix -----------
         # shift adj matrix to -1's and +1's
         adj_s = adj*2 - 1
 
+        # ----------- Closure function (LBFGS) -----------
         def closure():
             """Closure function for LBFGS optimizer. This function is called internally by the optimizer."""
             optimizer.zero_grad()
@@ -56,16 +75,18 @@ class Trainer:
             loss.backward()
             return loss
 
+        # ----------- Optimizer ----------- 
         if optim_type == 'adam':
-            optimizer = optim.Adam(model.parameters(), lr=0.1)
+            optimizer = optim.Adam(model.parameters(), lr=lr)
         elif optim_type == 'sgd':
-            optimizer = optim.SGD(model.parameters(), lr=0.01)
+            optimizer = optim.SGD(model.parameters(), lr=lr)
         elif optim_type == 'lbfgs':
-            optimizer = optim.LBFGS(model.parameters(), lr=0.01)
+            optimizer = optim.LBFGS(model.parameters(), lr=lr, max_eval=self.max_eval)
         else:
             raise ValueError(f'Optimizer {optim_type} not supported')
 
 
+        # ----------- Training loop -----------
         with tqdm(range(num_epochs)) as pbar:
             for epoch in pbar:
                 
@@ -86,12 +107,17 @@ class Trainer:
                     frob_error_norm = self.calc_frob_error_norm(A_hat, adj)
                     pbar.set_description(f"epoch={epoch}, loss={loss:.1f} Frobenius error: {frob_error_norm}")
 
+                # Log metrics to all loggers
+                metrics = {'epoch': epoch, 'loss': loss.item(), 'frob_error_norm': frob_error_norm.item()}
+                for logger in self.loggers:
+                    logger.log(metrics)
+
                 # Break if Froebenius error is less than 1e-7
                 if frob_error_norm < self.threshold:
                     pbar.close()
                     print(f'Full reconstruction at epoch {epoch} with rank {rank}')
                     break
-
+        
         # After training, retrieve parameters
         with torch.no_grad():  # Ensure no gradients are computed in this block
             return model.forward()

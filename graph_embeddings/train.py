@@ -7,6 +7,9 @@ from graph_embeddings.models.LPCAModel import LPCAModel
 from graph_embeddings.utils.loss import lpca_loss, L2_loss
 from graph_embeddings.utils.trainer import Trainer
 
+# import loggers
+import wandb
+from graph_embeddings.utils.logger import JSONLogger
 
 # Ensure CUDA is available and select device, if not check for Macbook Pro support (MPS) and finally use CPU
 device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
@@ -42,10 +45,10 @@ if __name__ == '__main__':
     # Initialize the trainer
     trainer = Trainer(adj=adj, model_class=model, loss_fn=loss_fn, 
                       threshold=10e-5, num_epochs=args.num_epochs, optim_type=args.optim_type, 
-                      device=device)
+                      device=args.device, max_eval=args.max_eval, loggers=[JSONLogger, wandb])
     
     # Train one model model
-    trainer.train(args.rank)
+    trainer.train(args.rank, lr=args.lr)
 
     # Find the optimal rank within a range
     # trainer.find_optimal_rank(1, 50)
