@@ -45,7 +45,7 @@ if __name__ == '__main__':
                       device=args.device, max_eval=args.max_eval, loggers=[JSONLogger, wandb])
     
     # Train one model model
-    trainer.train(args.rank, lr=args.lr)
+    trainer.train(args.rank, lr=args.lr, save_path='results/model.pt')
 
     # Find the optimal rank within a range
     # trainer.find_optimal_rank(1, 50)

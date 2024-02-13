@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
+import os
 
 from graph_embeddings.utils.logger import JSONLogger
 
@@ -23,7 +24,7 @@ class Trainer:
         clipped_logits = torch.clip(logits, min=0, max=1)
         return torch.linalg.norm(clipped_logits - adj) / torch.linalg.norm(adj)
 
-    def train(self, rank, lr=0.01):
+    def train(self, rank, lr=0.01, save_path=None):
         """ Train the model using the given optimizer and loss function.
         
         Args:
@@ -121,8 +122,24 @@ class Trainer:
         with torch.no_grad():  # Ensure no gradients are computed in this block
             final_outputs = model.forward()
 
+            # Save model to file
+            if save_path:
+                self._save_model(model, save_path)
+                for logger in self.loggers:
+                    logger.config.update({"model_path": save_path})
+
             # return final_outputs
             return final_outputs
+
+    def _save_model(self, model, path):
+        """Save the model to a file."""
+        # check if folder exists
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+
+        # save model
+        torch.save(model(), path)
+
 
     def find_optimal_rank(self, min_rank, max_rank):
         """Find the optimal rank for the model using binary search. 
