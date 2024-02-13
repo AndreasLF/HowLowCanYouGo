@@ -12,6 +12,23 @@ class JSONLogger:
         id = None
         name = None
 
+    class Config:
+        """Nested Config class to handle configuration updates."""
+        @classmethod
+        def update(cls, new_config):
+            """Update the configuration of the JSONLogger instance."""
+            if JSONLogger._instance is not None:
+                # Update the configuration with new values
+                JSONLogger._instance.data['config'].update(new_config)
+
+                # Write the updated data back to the log file
+                with open(JSONLogger._instance.file_name, 'w') as file:
+                    json.dump(JSONLogger._instance.data, file, indent=4)
+            else:
+                print("JSONLogger was not initialized or has already been finished.")
+
+    config = Config()  # Class attribute to access the Config class methods
+
     @classmethod
     def init(cls, project, config, log_folder='results'):
         if cls._instance is not None:
@@ -110,7 +127,8 @@ if __name__ == '__main__':
 
     uid = JSONLogger.run.id
     model_path = f"results/model_{uid}.pt"
-    JSONLogger.add_model_path(model_path)
+    JSONLogger.config.update({"model_path": model_path})
+
 
     # Finish logging
     JSONLogger.finish()

@@ -112,12 +112,17 @@ class Trainer:
                 # Break if Froebenius error is less than 1e-7
                 if frob_error_norm < self.threshold:
                     pbar.close()
+                    for logger in self.loggers:
+                        logger.config.update({'full_reconstruction': True})
                     print(f'Full reconstruction at epoch {epoch} with rank {rank}')
                     break
         
         # After training, retrieve parameters
         with torch.no_grad():  # Ensure no gradients are computed in this block
-            return model.forward()
+            final_outputs = model.forward()
+
+            # return final_outputs
+            return final_outputs
 
     def find_optimal_rank(self, min_rank, max_rank):
         """Find the optimal rank for the model using binary search. 
