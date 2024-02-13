@@ -5,9 +5,6 @@ from tqdm import tqdm
 
 from graph_embeddings.utils.logger import JSONLogger
 
-# Ensure CUDA is available and select device, if not check for Macbook Pro support (MPS) and finally use CPU
-device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
-
 class Trainer:
     def __init__(self, adj, model_class, loss_fn, threshold, num_epochs, optim_type='lbfgs', max_eval=25, device='cpu', loggers=[JSONLogger], project_name='GraphEmbeddings'):
         self.adj = adj.to(device)
@@ -38,8 +35,8 @@ class Trainer:
             V (np.ndarray): The right singular vectors
         """
 
-        adj = self.adj.to(device)
-        model = self.model_class(adj.size(0), adj.size(1), rank).to(device)
+        adj = self.adj.to(self.device)
+        model = self.model_class(adj.size(0), adj.size(1), rank).to(self.device)
         loss_fn = self.loss_fn
         optim_type = self.optim_type
         num_epochs = self.num_epochs

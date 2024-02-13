@@ -11,10 +11,6 @@ from graph_embeddings.utils.trainer import Trainer
 import wandb
 from graph_embeddings.utils.logger import JSONLogger
 
-# Ensure CUDA is available and select device, if not check for Macbook Pro support (MPS) and finally use CPU
-device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
-print(f'Using device: {device}')
-
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model-type', type=str, default='LPCA', choices=['LPCA','L2'], help='Type of model and loss to use {LPCA, L2} (default: %(default)s)')
@@ -30,11 +26,12 @@ if __name__ == '__main__':
     # parser.add_argument('--samples', type=str, default='samples.png', help='file to save samples in (default: %(default)s)')
     # parser.add_argument('--batch-size', type=int, default=32, metavar='N', help='batch size for training (default: %(default)s)')
 
-
     args = parser.parse_args()
     print('# Options')
     for key, value in sorted(vars(args).items()):
         print(key, '=', value)
+
+    device = args.device
 
     # Load and prepare your data
     adj = torch.load('./data/adj_matrices/Cora.pt').to(device)
