@@ -1,3 +1,9 @@
+experiments:
+  - name: Cora
+    config_path: './configs/experiments/exp1_cora.yaml'
+  - name: Citeseer
+    config_path: './configs/experiments/exp2_citeseer.yaml'
+  # Add more experiments as needed
 data:
   raw_path: ./data/raw
   adj_matrices_path: ./data/adj_matrices

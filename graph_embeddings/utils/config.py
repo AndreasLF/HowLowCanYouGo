@@ -17,6 +17,10 @@ class Config:
             except (KeyError, TypeError):
                 return None
         return value
-    
+     
     def __str__(self):
-        return str(self.CFG)
+        # Return the YAML formatted string for prettier printing
+        return yaml.dump(self.CFG, default_flow_style=False, sort_keys=True, indent=4, allow_unicode=True)
+
+    def __repr__(self):
+        return self.__str__()

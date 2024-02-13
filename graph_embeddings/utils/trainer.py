@@ -163,9 +163,9 @@ class Trainer:
         optimal_rank = upper_bound  # Assume the worst case initially
         thr = self.threshold
 
-        print('='*50)
+        print('-'*50)
         print(f'Finding optimal rank between {min_rank} and {max_rank}')
-        print('='*50)
+        print('-'*50)
 
         while lower_bound <= upper_bound:
             current_rank = (lower_bound + upper_bound) // 2
