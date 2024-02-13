@@ -128,8 +128,13 @@ class Trainer:
                 for logger in self.loggers:
                     logger.config.update({"model_path": save_path})
 
-            # return final_outputs
-            return final_outputs
+
+        # Finish logging
+        for logger in self.loggers:
+            logger.finish()
+
+        # return final_outputs
+        return final_outputs
 
     def _save_model(self, model, path):
         """Save the model to a file."""
