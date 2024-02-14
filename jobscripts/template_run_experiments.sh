@@ -29,8 +29,9 @@
 
 nvidia-smi
 # Load the cuda module
-module load python/3.11.7
-module load cuda/12.0
+# Load the cuda module
+module load python3/3.11.7
+module load cuda/11.6
 
 source <path to venv>
 cd <project folder>
