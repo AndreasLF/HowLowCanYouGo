@@ -13,7 +13,8 @@ from utils.config import Config
 
 def run_experiment(config: Config, device: str = 'cpu', results_folder: str = 'results', experiment_name: str = 'experiment'):
     # Load and prepare your data
-    adj = torch.load(config.get("dataset_path")).to(config.get('device'))
+    dataset_path = config.get("dataset_path")
+    adj = torch.load(dataset_path).to(config.get('device'))
     
     model_types = config.get('model_types')
 
@@ -27,7 +28,7 @@ def run_experiment(config: Config, device: str = 'cpu', results_folder: str = 'r
         # Initialize the trainer
         trainer = Trainer(adj=adj, model_class=model, loss_fn=loss_fn, 
                         threshold=1e-7, num_epochs=config.get("num_epochs"), optim_type=config.get('optim_type'), 
-                        device=device, max_eval=config.get('max_eval'), loggers=[JSONLogger, wandb])
+                        device=device, max_eval=config.get('max_eval'), loggers=[JSONLogger], dataset_path=dataset_path)
         
         # If rank_range is specified, search for the optimal rank
         rank_range = config.get('rank_range')

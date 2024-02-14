@@ -16,7 +16,8 @@ class Trainer:
                  max_eval=25, 
                  device='cpu', 
                  loggers=[JSONLogger], 
-                 project_name='GraphEmbeddings'):
+                 project_name='GraphEmbeddings',
+                 dataset_path='not specified'):
         """Initialize the trainer."""   
         
         self.adj = adj.to(device)
@@ -29,6 +30,7 @@ class Trainer:
         self.device = device
         self.loggers = loggers
         self.project_name = project_name
+        self.dataset_path = dataset_path
 
     def calc_frob_error_norm(self, logits, adj):
         """Compute the Frobenius error norm between the logits and the adjacency matrix."""
@@ -52,6 +54,7 @@ class Trainer:
         loss_fn = self.loss_fn
         optim_type = self.optim_type
         num_epochs = self.num_epochs
+        dataset_path = self.dataset_path
         full_reconstruction = False
 
         # ----------- Initialize logging -----------
@@ -68,7 +71,9 @@ class Trainer:
                                 'learning_rate': lr,
                                 'optim_type': optim_type,
                                 'loss_fn': loss_fn_name, 
-                                'model_class': model_class_name})
+                                'model_class': model_class_name,
+                                'dataset_path': dataset_path
+                                })
 
 
         # ----------- Shift adjacency matrix -----------
