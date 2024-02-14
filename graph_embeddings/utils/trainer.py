@@ -7,12 +7,15 @@ import os
 from graph_embeddings.utils.logger import JSONLogger
 
 class Trainer:
-    def __init__(self, adj, 
+    def __init__(self, 
+                 adj, 
                  model_class, 
                  loss_fn, 
                  threshold, 
                  num_epochs, 
-                 optim_type='lbfgs', 
+                 save_ckpt, 
+                 load_ckpt,optim_type='lbfgs', 
+                 model_init='random', 
                  max_eval=25, 
                  device='cpu', 
                  loggers=[JSONLogger], 
@@ -25,7 +28,10 @@ class Trainer:
         self.loss_fn = loss_fn
         self.threshold = threshold
         self.num_epochs = num_epochs
+        self.save_ckpt = save_ckpt
+        self.load_ckpt = load_ckpt
         self.optim_type = optim_type
+        self.model_init = model_init
         self.max_eval = max_eval
         self.device = device
         self.loggers = loggers
@@ -50,7 +56,20 @@ class Trainer:
         """
 
         adj = self.adj.to(self.device)
-        model = self.model_class(adj.size(0), adj.size(1), rank).to(self.device)
+        if self.model_init == 'random':
+            model = self.model_class.init_random(adj.size(0), adj.size(1), rank).to(self.device)
+        elif self.model_init == 'svd':
+            # raise Exception(f"initialization ({self.model_init}) is not yet fully implemented!")
+            U,_,V = torch.svd(adj)
+            model = self.model_class.init_pre_svd(U, V, device=self.device)
+        elif self.model_init == 'load':
+            model_params = torch.load(self.load_ckpt)
+            model = self.model_class(*model_params).to(self.device)
+        elif self.model_init == 'loadsvd':
+            model_params = torch.load(self.load_ckpt)
+            model = self.model_class.init_post_svd(*model_params).to(self.device)
+        else:
+            raise Exception(f"selected model initialization ({self.model_init}) is not currently implemented")
         loss_fn = self.loss_fn
         optim_type = self.optim_type
         num_epochs = self.num_epochs

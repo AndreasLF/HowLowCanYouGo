@@ -3,11 +3,57 @@ import torch.nn as nn
 
 # Define the model, in this case our Euclidean embedding model
 class L2Model(nn.Module):
-    def __init__(self, n_row, n_col, rank, device="cpu"):
+    def __init__(self, 
+                 X: torch.Tensor, 
+                 Y: torch.Tensor, 
+                 device: str="cpu",
+                 inference_only: bool=False):
         super(L2Model, self).__init__()
-        self.X = nn.Parameter(torch.randn(n_row, rank).to(device))
-        self.Y = nn.Parameter(torch.randn(rank, n_col).to(device))
+        X = X.to(device)
+        Y = Y.to(device)
+        self.X = nn.Parameter(X) if not inference_only else X
+        self.Y = nn.Parameter(Y) if not inference_only else Y
         self.beta = nn.Parameter(torch.randn(1).to(device)) # scalar free parameter bias term
+
+    @classmethod
+    def init_random(cls, 
+                    n_row: int, 
+                    n_col: int, 
+                    rank: int):
+        X = torch.randn(n_row, rank)
+        Y = torch.randn(rank, n_col)
+        return cls(X,Y)
+    
+    """
+    Method 1 of 2. [together with init_post_svd]
+    Initialize a model for pre-training (to improve initialization point), 
+        with unitary matrices U and V from SVD on A, for learning S.
+    """
+    @classmethod
+    def init_pre_svd(cls, 
+                     U: torch.Tensor, 
+                     V: torch.Tensor, 
+                     device: str="cpu"):
+        assert U.shape[1] == V.shape[0], "U & V must be dimensions (n,r) & (r,n), respectively, r: emb. rank, n: # of nodes"
+        model = cls(U, V, inference_only=True) # we only learn S in A = USV^T
+        S = torch.diag(torch.ones(U.shape[1])).to(device)
+        model.S = nn.Parameter(S)
+        return model
+    
+    """
+    Method 2 of 2. [together with init_pre_svd]
+    Initialize a model for further training, using U, V and learned S to 
+        compute an improved initialization point.
+    """
+    @classmethod
+    def init_post_svd(cls, 
+                      U: torch.Tensor, 
+                      V: torch.Tensor, 
+                      S: torch.Tensor):
+        S_inv_sqrt = S**(-1/2)
+        X = S_inv_sqrt @ U
+        Y = S_inv_sqrt @ V.T
+        return cls(X,Y)
 
     def reconstruct(self):
         norms = torch.norm(self.X[:,None] - self.Y.T, p=2, dim=-1)
