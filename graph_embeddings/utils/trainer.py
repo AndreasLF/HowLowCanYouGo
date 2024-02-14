@@ -150,7 +150,7 @@ class Trainer:
             logger.finish()
 
         # return final_outputs
-        return final_outputs
+        return model
 
     def _save_model(self, model, path):
         """Save the model to a file."""
@@ -212,10 +212,10 @@ class Trainer:
                 save_path = None
 
             # Train the model
-            U, V = self.train(current_rank, save_path=save_path)
+            model = self.train(current_rank, save_path=save_path)
 
             # Calculate the Frobenius error
-            logits = U @ V
+            logits = model.reconstruct()
             frob_error = self.calc_frob_error_norm(logits, self.adj)
 
             # Check if the reconstruction is within the threshold
