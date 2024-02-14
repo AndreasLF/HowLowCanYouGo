@@ -1,4 +1,4 @@
-dataset_path: './data/adj_matrices/Cora.pt'
+dataset_path: './data/adj_matrices/Citeseer.pt'
 model_types: ['L2', 'LPCA']
 num_epochs: 50_000
 optim_type: 'adam'
