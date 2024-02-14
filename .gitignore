@@ -180,3 +180,5 @@ cython_debug/
 /data
 /wandb
 /notebooks/original_paper_modified_ExactEmbeddings.ipynb
+
+gdrive-access.json
