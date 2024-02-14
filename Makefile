@@ -35,5 +35,5 @@ clean:
 datasets:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/data/make_datasets.py
 
-train:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py
+run_experiments:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/run_experiments.py $(ARGS)

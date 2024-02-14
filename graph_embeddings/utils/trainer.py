@@ -1,30 +1,41 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from tqdm import tqdm
+import os
 
-from graph_embeddings.models.LPCAModel import LPCAModel
-from graph_embeddings.utils.loss import lpca_loss
-
-
-# Ensure CUDA is available and select device, if not check for Macbook Pro support (MPS) and finally use CPU
-device = torch.device('cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu')
+from graph_embeddings.utils.logger import JSONLogger
 
 class Trainer:
-    def __init__(self, adj, model_class, loss_funct, threshold, num_epochs, optim_type='lbfgs', device='cpu'):
+    def __init__(self, adj, 
+                 model_class, 
+                 loss_fn, 
+                 threshold, 
+                 num_epochs, 
+                 optim_type='lbfgs', 
+                 max_eval=25, 
+                 device='cpu', 
+                 loggers=[JSONLogger], 
+                 project_name='GraphEmbeddings'):
+        """Initialize the trainer."""   
+        
         self.adj = adj.to(device)
         self.model_class = model_class
-        self.loss_funct = loss_funct
+        self.loss_fn = loss_fn
         self.threshold = threshold
         self.num_epochs = num_epochs
         self.optim_type = optim_type
+        self.max_eval = max_eval
         self.device = device
+        self.loggers = loggers
+        self.project_name = project_name
 
     def calc_frob_error_norm(self, logits, adj):
         """Compute the Frobenius error norm between the logits and the adjacency matrix."""
         clipped_logits = torch.clip(logits, min=0, max=1)
         return torch.linalg.norm(clipped_logits - adj) / torch.linalg.norm(adj)
 
-    def train(self, rank, print_loss_interval=10):
+    def train(self, rank, lr=0.01, save_path=None):
         """ Train the model using the given optimizer and loss function.
         
         Args:
@@ -34,70 +45,142 @@ class Trainer:
         Returns:
             U (np.ndarray): The left singular vectors
             V (np.ndarray): The right singular vectors
-        
         """
-        adj = self.adj.to(device)
-        model = self.model_class(adj.size(0), adj.size(1), rank).to(device)
-        loss_funct = self.loss_funct
+
+        adj = self.adj.to(self.device)
+        model = self.model_class(adj.size(0), adj.size(1), rank).to(self.device)
+        loss_fn = self.loss_fn
         optim_type = self.optim_type
         num_epochs = self.num_epochs
+        full_reconstruction = False
+
+        # ----------- Initialize logging -----------
+        # get loss_fn function name
+        loss_fn_name = loss_fn.__name__
+        # get self.model_class function name
+        model_class_name = self.model_class.__name__
+
+        # initialize logging to all loggers
+        for logger in self.loggers:
+            logger.init(project=self.project_name, 
+                        config={'rank': rank, 
+                                'num_epochs': num_epochs, 
+                                'learning_rate': lr,
+                                'optim_type': optim_type,
+                                'loss_fn': loss_fn_name, 
+                                'model_class': model_class_name})
 
 
+        # ----------- Shift adjacency matrix -----------
         # shift adj matrix to -1's and +1's
         adj_s = adj*2 - 1
 
+        # ----------- Closure function (LBFGS) -----------
         def closure():
             """Closure function for LBFGS optimizer. This function is called internally by the optimizer."""
             optimizer.zero_grad()
-            logits = model.forward() 
-            loss = loss_funct(logits, adj_s) 
+            A_hat = model.reconstruct()
+            loss = loss_fn(A_hat, adj_s) 
             loss.backward()
             return loss
 
+        # ----------- Optimizer ----------- 
         if optim_type == 'adam':
-            optimizer = optim.Adam(model.parameters(), lr=0.1)
+            optimizer = optim.Adam(model.parameters(), lr=lr)
         elif optim_type == 'sgd':
-            optimizer = optim.SGD(model.parameters(), lr=0.01)
+            optimizer = optim.SGD(model.parameters(), lr=lr)
         elif optim_type == 'lbfgs':
-            optimizer = optim.LBFGS(model.parameters(), lr=0.01)
+            optimizer = optim.LBFGS(model.parameters(), lr=lr, max_eval=self.max_eval)
         else:
             raise ValueError(f'Optimizer {optim_type} not supported')
 
-        for epoch in range(num_epochs):
 
-            if optim_type == 'lbfgs':
-                # LBFGS optimizer step takes the closure function and internally calls it multiple times
-                loss = optimizer.step(closure)
-            else: 
-                # Forward pass
-                optimizer.zero_grad()
-                logits = model.forward()  # Or simply model() if you have defined the forward method
-                loss = loss_funct(logits, adj_s)  # Ensure lpca_loss is compatible with PyTorch and returns a scalar tensor
-                loss.backward()
-                optimizer.step()
-
-
-            # evaluate the loss
-            with torch.no_grad():  # Ensure no gradients are computed in this block
-                logits = model.forward()
-                frob_error_norm = self.calc_frob_error_norm(logits, adj)
-
-            # Break if Froebenius error is less than 1e-7
-            if frob_error_norm < self.threshold:
-                print(f'Epoch {epoch}, Loss: {loss.item()}, Frobenius error: {frob_error_norm}')
-                break
+        # ----------- Training loop -----------
+        with tqdm(range(num_epochs)) as pbar:
+            for epoch in pbar:
                 
-            if epoch % print_loss_interval == 0:
-                print(f'Epoch {epoch}, Loss: {loss.item()}, Frobenius error: {frob_error_norm}')
+                if optim_type == 'lbfgs':
+                    # LBFGS optimizer step takes the closure function and internally calls it multiple times
+                    loss = optimizer.step(closure)
+                else: 
+                    # Forward pass
+                    optimizer.zero_grad()
+                    A_hat = model.reconstruct() 
+                    loss = loss_fn(A_hat, adj_s)  # Ensure lpca_loss is compatible with PyTorch and returns a scalar tensor
+                    loss.backward()
+                    optimizer.step()
 
+                # Compute and print the Frobenius norm for diagnostics
+                with torch.no_grad():  # Ensure no gradients are computed in this block
+                    A_hat = model.reconstruct()
+                    frob_error_norm = self.calc_frob_error_norm(A_hat, adj)
+                    pbar.set_description(f"epoch={epoch}, loss={loss:.1f} Frobenius error: {frob_error_norm}")
 
+                # Log metrics to all loggers
+                metrics = {'epoch': epoch, 'loss': loss.item(), 'frob_error_norm': frob_error_norm.item()}
+                for logger in self.loggers:
+                    logger.log(metrics)
+
+                # Break if Froebenius error is less than 1e-15
+                if frob_error_norm <= self.threshold:
+                    pbar.close()
+                    for logger in self.loggers:
+                        logger.config.update({'full_reconstruction': True})
+                    full_reconstruction = True
+                    print(f'Full reconstruction at epoch {epoch} with rank {rank}')
+                    break
+        
         # After training, retrieve parameters
         with torch.no_grad():  # Ensure no gradients are computed in this block
-            U, V = model.U, model.V
+            final_outputs = model.forward()
 
-        return U, V
+            # Save model to file
+            if save_path:
 
-    def find_optimal_rank(self, min_rank, max_rank):
+                # Add _FR to the file name if full reconstruction is achieved
+                save_path = save_path.replace('.pt', '_FR.pt') if full_reconstruction else save_path
+
+                self._save_model(model, save_path)
+                for logger in self.loggers:
+                    logger.config.update({"model_path": save_path})
+
+
+        # Finish logging
+        for logger in self.loggers:
+            logger.finish()
+
+        # return final_outputs
+        return final_outputs
+
+    def _save_model(self, model, path):
+        """Save the model to a file."""
+        # check if folder exists
+        if not os.path.exists(os.path.dirname(path)):
+            os.makedirs(os.path.dirname(path))
+
+        # save model
+        torch.save(model(), path)
+
+
+    def _make_model_save_path(self, experiment_name, results_folder='results', rank=None, model_type=None):
+        """Create a save path for the model."""
+        if not experiment_name:
+            raise ValueError('experiment_name cannot be None')
+
+        models_folder = os.path.join(results_folder, 'models')
+
+        if not os.path.exists(models_folder):
+            os.makedirs(models_folder)
+
+        if model_type:
+            experiment_name = f'{experiment_name}_{model_type}'
+        if rank:
+            experiment_name = f'{experiment_name}_{rank}'
+        
+        experiment_name = f'{models_folder}/{experiment_name}.pt'
+        return os.path.join(models_folder, experiment_name)
+    
+    def find_optimal_rank(self, min_rank, max_rank, experiment_name=None, results_folder='results'):
         """Find the optimal rank for the model using binary search. 
 
         Args:
@@ -114,19 +197,22 @@ class Trainer:
         optimal_rank = upper_bound  # Assume the worst case initially
         thr = self.threshold
 
-        print('='*50)
+        print('-'*50)
         print(f'Finding optimal rank between {min_rank} and {max_rank}')
-        print('='*50)
+        print('-'*50)
 
         while lower_bound <= upper_bound:
             current_rank = (lower_bound + upper_bound) // 2
             print(f'Training model with rank {current_rank}')
 
-            # Set the threshold for the Frobenius error
-            thr = 10e-5
+            # Create a save path for the model
+            if experiment_name:
+                save_path = self._make_model_save_path(experiment_name, results_folder=results_folder, rank=current_rank, model_type=self.model_class.__name__)
+            else:
+                save_path = None
 
             # Train the model
-            U, V = self.train(current_rank)
+            U, V = self.train(current_rank, save_path=save_path)
 
             # Calculate the Frobenius error
             logits = U @ V
