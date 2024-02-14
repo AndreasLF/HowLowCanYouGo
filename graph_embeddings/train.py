@@ -36,9 +36,9 @@ if __name__ == '__main__':
     adj = torch.load('./data/adj_matrices/Cora.pt').to(device)
 
     if args.train_mode == 'reconstruct':
-        model_init = 'random' if args.load_ckpt is None else 'load' # TODO add load from ckpt functionality
+        model_init = 'random' if args.load_ckpt == 'none' else 'load'
     elif args.train_mode == 'pretrain':
-        model_init = 'svd' if args.load_ckpt is None else 'loadsvd' # TODO add load from ckpt functionality
+        model_init = 'svd' if args.load_ckpt == 'none' else 'loadsvd'
 
     model = LPCAModel if args.model_type == 'LPCA' else L2Model
     loss_fn = lpca_loss if args.model_type == 'LPCA' else L2_loss

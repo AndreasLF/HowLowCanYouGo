@@ -60,7 +60,9 @@ class Trainer:
             model = self.model_class.init_random(adj.size(0), adj.size(1), rank).to(self.device)
         elif self.model_init == 'svd':
             # raise Exception(f"initialization ({self.model_init}) is not yet fully implemented!")
-            U,_,V = torch.svd(adj)
+            U,_,V = torch.linalg.svd(adj)
+            U = U[:,:32] # ? truncate to dim 32
+            V = V[:,:32].T # ? truncate to dim 32
             model = self.model_class.init_pre_svd(U, V, device=self.device)
         elif self.model_init == 'load':
             model_params = torch.load(self.load_ckpt)

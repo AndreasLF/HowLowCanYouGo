@@ -14,6 +14,7 @@ class L2Model(nn.Module):
         self.X = nn.Parameter(X) if not inference_only else X
         self.Y = nn.Parameter(Y) if not inference_only else Y
         self.beta = nn.Parameter(torch.randn(1).to(device)) # scalar free parameter bias term
+        self.S = None # ! only set if pretraining on SVD objective
 
     @classmethod
     def init_random(cls, 
@@ -36,7 +37,7 @@ class L2Model(nn.Module):
                      device: str="cpu"):
         assert U.shape[1] == V.shape[0], "U & V must be dimensions (n,r) & (r,n), respectively, r: emb. rank, n: # of nodes"
         model = cls(U, V, inference_only=True) # we only learn S in A = USV^T
-        S = torch.diag(torch.ones(U.shape[1])).to(device)
+        S = torch.randn(U.shape[1]).to(device)
         model.S = nn.Parameter(S)
         return model
     
@@ -56,7 +57,11 @@ class L2Model(nn.Module):
         return cls(X,Y)
 
     def reconstruct(self):
-        norms = torch.norm(self.X[:,None] - self.Y.T, p=2, dim=-1)
+        if self.S is not None:
+            _S = torch.diag(self.S)
+            norms = torch.norm((self.X@_S)[:,None] - (self.Y.T@_S), p=2, dim=-1)
+        else:
+            norms = torch.norm(self.X[:,None] - self.Y.T, p=2, dim=-1)
         A_hat = - norms + self.beta
         return A_hat
 
