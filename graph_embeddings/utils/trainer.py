@@ -12,6 +12,8 @@ class Trainer:
                  save_ckpt, load_ckpt,optim_type='lbfgs', model_init='random', 
                  max_eval=25, device='cpu', loggers=[JSONLogger], 
                  project_name='GraphEmbeddings'):
+        """Initialize the trainer."""   
+        
         self.adj = adj.to(device)
         self.model_class = model_class
         self.loss_fn = loss_fn
@@ -61,7 +63,7 @@ class Trainer:
         loss_fn = self.loss_fn
         optim_type = self.optim_type
         num_epochs = self.num_epochs
-
+        full_reconstruction = False
 
         # ----------- Initialize logging -----------
         # get loss_fn function name
@@ -130,11 +132,12 @@ class Trainer:
                 for logger in self.loggers:
                     logger.log(metrics)
 
-                # Break if Froebenius error is less than 1e-7
-                if frob_error_norm < self.threshold:
+                # Break if Froebenius error is less than 1e-15
+                if frob_error_norm <= self.threshold:
                     pbar.close()
                     for logger in self.loggers:
                         logger.config.update({'full_reconstruction': True})
+                    full_reconstruction = True
                     print(f'Full reconstruction at epoch {epoch} with rank {rank}')
                     break
         
@@ -144,6 +147,10 @@ class Trainer:
 
             # Save model to file
             if save_path:
+
+                # Add _FR to the file name if full reconstruction is achieved
+                save_path = save_path.replace('.pt', '_FR.pt') if full_reconstruction else save_path
+
                 self._save_model(model, save_path)
                 for logger in self.loggers:
                     logger.config.update({"model_path": save_path})
@@ -166,7 +173,25 @@ class Trainer:
         torch.save(model(), path)
 
 
-    def find_optimal_rank(self, min_rank, max_rank):
+    def _make_model_save_path(self, experiment_name, results_folder='results', rank=None, model_type=None):
+        """Create a save path for the model."""
+        if not experiment_name:
+            raise ValueError('experiment_name cannot be None')
+
+        models_folder = os.path.join(results_folder, 'models')
+
+        if not os.path.exists(models_folder):
+            os.makedirs(models_folder)
+
+        if model_type:
+            experiment_name = f'{experiment_name}_{model_type}'
+        if rank:
+            experiment_name = f'{experiment_name}_{rank}'
+        
+        experiment_name = f'{models_folder}/{experiment_name}.pt'
+        return os.path.join(models_folder, experiment_name)
+    
+    def find_optimal_rank(self, min_rank, max_rank, experiment_name=None, results_folder='results'):
         """Find the optimal rank for the model using binary search. 
 
         Args:
@@ -191,11 +216,14 @@ class Trainer:
             current_rank = (lower_bound + upper_bound) // 2
             print(f'Training model with rank {current_rank}')
 
-            # Set the threshold for the Frobenius error
-            thr = 10e-5
+            # Create a save path for the model
+            if experiment_name:
+                save_path = self._make_model_save_path(experiment_name, results_folder=results_folder, rank=current_rank, model_type=self.model_class.__name__)
+            else:
+                save_path = None
 
             # Train the model
-            U, V = self.train(current_rank)
+            U, V = self.train(current_rank, save_path=save_path)
 
             # Calculate the Frobenius error
             logits = U @ V

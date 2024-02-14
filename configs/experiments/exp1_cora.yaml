@@ -1,6 +1,6 @@
 dataset_path: './data/adj_matrices/Cora.pt'
 model_types: ['LPCA', 'L2']
-num_epochs: 5000
+num_epochs: 100000
 optim_type: 'adam'
 max_eval: 25
 lr: 0.01
