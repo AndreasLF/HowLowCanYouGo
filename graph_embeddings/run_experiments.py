@@ -11,11 +11,10 @@ from graph_embeddings.utils.logger import JSONLogger
 
 from utils.config import Config
 
-def run_experiment(config: Config, device: str = 'cpu'):
+def run_experiment(config: Config, device: str = 'cpu', results_folder: str = 'results', experiment_name: str = 'experiment'):
     # Load and prepare your data
     adj = torch.load(config.get("dataset_path")).to(config.get('device'))
     
-
     model_types = config.get('model_types')
 
     for model_type in model_types:
@@ -27,13 +26,13 @@ def run_experiment(config: Config, device: str = 'cpu'):
         
         # Initialize the trainer
         trainer = Trainer(adj=adj, model_class=model, loss_fn=loss_fn, 
-                        threshold=10e-5, num_epochs=config.get("num_epochs"), optim_type=config.get('optim_type'), 
-                        device=device, max_eval=config.get('max_eval'), loggers=[JSONLogger])
+                        threshold=1e-7, num_epochs=config.get("num_epochs"), optim_type=config.get('optim_type'), 
+                        device=device, max_eval=config.get('max_eval'), loggers=[JSONLogger, wandb])
         
         # If rank_range is specified, search for the optimal rank
         rank_range = config.get('rank_range')
         if rank_range:
-            trainer.find_optimal_rank(rank_range['min'], rank_range['max'])
+            trainer.find_optimal_rank(rank_range['min'], rank_range['max'], experiment_name=experiment_name)
 
 def main():
     parser = argparse.ArgumentParser()
@@ -57,7 +56,7 @@ def main():
         print(exp_config)
         print("="*50)
 
-        run_experiment(exp_config, device)
+        run_experiment(exp_config, device, experiment['name'])
 
 if __name__ == '__main__':
     main()
