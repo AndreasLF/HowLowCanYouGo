@@ -62,22 +62,22 @@ This will run the experiments defined in the `configs/config.yaml` file.
 The experiments are defined in the `configs/config.yaml` file. Here you can define the experiments with names and an experiment configuration. An example can be seen below:
 ```yaml
 experiments:
-  - name: Cora1
-    config_path: './configs/experiments/exp1_cora.yaml'
+  - name: Cora1 # Name of the experiment
+    config_path: './configs/experiments/exp1_cora.yaml' # Path to the experiment configuration file
 ```
 
 ### Experiment configuration file
 The experiment configuration file is a yaml file that defines the experiment. An example can be seen below:
 ```yaml
-dataset_path: './data/adj_matrices/Cora.pt'
-model_types: ['L2', 'LPCA']
-num_epochs: 50_000
-optim_type: 'adam'
-max_eval: 25
-model_init: 'random'
-lr: 0.1
-early_stop_patience: 500
-rank_range:
-  min: 1
-  max: 50
+dataset_path: './data/adj_matrices/Cora.pt' # Path to the dataset
+model_types: ['L2', 'LPCA'] # Which models to run
+num_epochs: 50_000 # Number of epochs to run
+optim_type: 'adam' # Optimizer type
+max_eval: 25 # Number of evaluations, used for LBFGS
+model_init: 'random' # Model initialization, random or svd
+lr: 0.1 # Learning rate
+early_stop_patience: 500 # Early stopping patience, if no improvement in loss after this number of consecutive epochs, stop
+rank_range: # Range of ranks to make binary search over
+  min: 1 # Minimum rank
+  max: 50 # Maximum rank
 ```
