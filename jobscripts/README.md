@@ -1,4 +1,4 @@
-# Submitting jobs to the cluster
+# Running experiments on HPC cluster
 We are using the HPC cluster at the Techincal University of Denmark to run our experiments. More info can be found [here](https://www.hpc.dtu.dk/).
 
 ## Accessing the cluster
