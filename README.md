@@ -40,3 +40,44 @@ Just run the following command:
 make datasets
 ```
 This should download the data from the sources and preprocess it into adjacency matrices with edge weights of either 1 or 0.
+
+
+## Run experiments to find lowest rank representation for LPCA and L2
+To run an experiment you can use:
+```bash
+make run_experiments ARGS="--device cpu --experiment Cora1"
+```
+The following arguments can be used:
+<!-- Create table with args -->
+| Argument | Description | Default |
+| --- | --- | --- |
+| `--device` | Device to run the experiments on. | `cpu` |
+| `--all` | Run all experiments. | `False` |
+| `--experiment` | Run a specific experiment. This should be defined in the main config. | `None` |
+| `--dev` | Run in development mode, i.e. without WANDB logging. | `False` |
+
+This will run the experiments defined in the `configs/config.yaml` file.
+
+### Experiment definition (main config)
+The experiments are defined in the `configs/config.yaml` file. Here you can define the experiments with names and an experiment configuration. An example can be seen below:
+```yaml
+experiments:
+  - name: Cora1
+    config_path: './configs/experiments/exp1_cora.yaml'
+```
+
+### Experiment configuration file
+The experiment configuration file is a yaml file that defines the experiment. An example can be seen below:
+```yaml
+dataset_path: './data/adj_matrices/Cora.pt'
+model_types: ['L2', 'LPCA']
+num_epochs: 50_000
+optim_type: 'adam'
+max_eval: 25
+model_init: 'random'
+lr: 0.1
+early_stop_patience: 500
+rank_range:
+  min: 1
+  max: 50
+```
