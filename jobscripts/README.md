@@ -12,7 +12,7 @@ ssh login.gbar.dtu.dk
 ## Jobscripts
 For reproducibility purpososes we have provided a jobscript template along with a submit_job script. The experiment config files can all be found in the [configs folder](https://github.com/AndreasLF/GraphEmbeddings/tree/main/configs).
 
-To be able to run the jobscripts you need to create an `env_vars.sh` and place it in the [jobscrips folder](https://github.com/AndreasLF/GraphEmbeddings/tree/main/jobscripts). Below is an example of vontents of the `env_vars.sh` file:
+To be able to run the jobscripts you need to create an `env_vars.sh` and place it in the [jobscrips folder](https://github.com/AndreasLF/GraphEmbeddings/tree/main/jobscripts). Below is an example of the contents of an `env_vars.sh` file:
 
 ```sh
 export WORKING_DIR=<working_directory>
