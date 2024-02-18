@@ -14,7 +14,8 @@ class Trainer:
                  threshold, 
                  num_epochs, 
                  save_ckpt, 
-                 load_ckpt,optim_type='lbfgs', 
+                 load_ckpt=None, 
+                 optim_type='lbfgs', 
                  model_init='random', 
                  max_eval=25, 
                  device='cpu', 
@@ -43,7 +44,7 @@ class Trainer:
         clipped_logits = torch.clip(logits, min=0, max=1)
         return torch.linalg.norm(clipped_logits - adj) / torch.linalg.norm(adj)
 
-    def train(self, rank, lr=0.01, save_path=None):
+    def train(self, rank, lr=0.01, early_stop_patience=None, save_path=None):
         """ Train the model using the given optimizer and loss function.
         
         Args:
@@ -93,7 +94,8 @@ class Trainer:
                                 'optim_type': optim_type,
                                 'loss_fn': loss_fn_name, 
                                 'model_class': model_class_name,
-                                'dataset_path': dataset_path
+                                'dataset_path': dataset_path,
+                                'early_stop_patience': early_stop_patience
                                 })
 
 
@@ -123,6 +125,10 @@ class Trainer:
 
         # ----------- Training loop -----------
         with tqdm(range(num_epochs)) as pbar:
+
+            best_loss = float('inf')  # Initialize best_loss to a very high value
+            epochs_no_improve = 0  # Counter to keep track of epochs with no improvement
+
             for epoch in pbar:
                 
                 if optim_type == 'lbfgs':
@@ -155,14 +161,27 @@ class Trainer:
                     full_reconstruction = True
                     print(f'Full reconstruction at epoch {epoch} with rank {rank}')
                     break
+
+                if early_stop_patience is not None:
+
+                    # Early stopping condition based on loss improvement
+                    if loss < best_loss:
+                        best_loss = loss  # Update best loss
+                        epochs_no_improve = 0  # Reset the counter as we have improvement
+                    else:
+                        epochs_no_improve += 1  # Increment counter if no improvement
+
+                    # Check if early stopping is triggered
+                    if epochs_no_improve >= early_stop_patience:
+                        for logger in self.loggers:
+                            logger.config.update({'early_stop_triggered': True})
+                        print(f"Early stopping triggered at epoch {epoch}. No improvement in loss for {early_stop_patience} consecutive epochs.")
+                        break
         
         # After training, retrieve parameters
         with torch.no_grad():  # Ensure no gradients are computed in this block
-            final_outputs = model.forward()
-
             # Save model to file
             if save_path:
-
                 # Add _FR to the file name if full reconstruction is achieved
                 save_path = save_path.replace('.pt', '_FR.pt') if full_reconstruction else save_path
 
@@ -203,10 +222,10 @@ class Trainer:
         if rank:
             experiment_name = f'{experiment_name}_{rank}'
         
-        experiment_name = f'{models_folder}/{experiment_name}.pt'
+        experiment_name = f'{experiment_name}.pt'
         return os.path.join(models_folder, experiment_name)
     
-    def find_optimal_rank(self, min_rank, max_rank, experiment_name=None, results_folder='results'):
+    def find_optimal_rank(self, min_rank, max_rank, lr=0.01, early_stop_patience=None, experiment_name=None, results_folder='results'):
         """Find the optimal rank for the model using binary search. 
 
         Args:
@@ -238,7 +257,7 @@ class Trainer:
                 save_path = None
 
             # Train the model
-            model = self.train(current_rank, save_path=save_path)
+            model = self.train(current_rank, lr=lr, early_stop_patience=early_stop_patience, save_path=save_path)
 
             # Calculate the Frobenius error
             logits = model.reconstruct()

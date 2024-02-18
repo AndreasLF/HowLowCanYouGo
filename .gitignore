@@ -1,3 +1,5 @@
+jobscripts/env_vars.sh
+
 results/GraphEmbeddings/
 
 notebooks/ExactEmbeddings.ipynb

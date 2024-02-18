@@ -40,3 +40,44 @@ Just run the following command:
 make datasets
 ```
 This should download the data from the sources and preprocess it into adjacency matrices with edge weights of either 1 or 0.
+
+
+## Run experiments to find lowest rank representation for LPCA and L2
+To run an experiment you can use:
+```bash
+make run_experiments ARGS="--device cpu --experiment Cora1"
+```
+The following arguments can be used:
+<!-- Create table with args -->
+| Argument | Description | Default |
+| --- | --- | --- |
+| `--device` | Device to run the experiments on. | `cpu` |
+| `--all` | Run all experiments. | `False` |
+| `--experiment` | Run a specific experiment. This should be defined in the main config. | `None` |
+| `--dev` | Run in development mode, i.e. without WANDB logging. | `False` |
+
+This will run the experiments defined in the `configs/config.yaml` file.
+
+### Experiment definition (main config)
+The experiments are defined in the `configs/config.yaml` file. Here you can define the experiments with names and an experiment configuration. An example can be seen below:
+```yaml
+experiments:
+  - name: Cora1 # Name of the experiment
+    config_path: './configs/experiments/exp1_cora.yaml' # Path to the experiment configuration file
+```
+
+### Experiment configuration file
+The experiment configuration file is a yaml file that defines the experiment. An example can be seen below:
+```yaml
+dataset_path: './data/adj_matrices/Cora.pt' # Path to the dataset
+model_types: ['L2', 'LPCA'] # Which models to run
+num_epochs: 50_000 # Number of epochs to run
+optim_type: 'adam' # Optimizer type
+max_eval: 25 # Number of evaluations, used for LBFGS
+model_init: 'random' # Model initialization, random or svd
+lr: 0.1 # Learning rate
+early_stop_patience: 500 # Early stopping patience, if no improvement in loss after this number of consecutive epochs, stop
+rank_range: # Range of ranks to make binary search over
+  min: 1 # Minimum rank
+  max: 50 # Maximum rank
+```
