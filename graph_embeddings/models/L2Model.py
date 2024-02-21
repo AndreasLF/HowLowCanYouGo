@@ -1,7 +1,9 @@
+import pdb
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
-# Define the model, in this case our Euclidean embedding model
+# Euclidean embedding model
 class L2Model(nn.Module):
     def __init__(self, 
                  X: torch.Tensor, 
@@ -22,7 +24,7 @@ class L2Model(nn.Module):
                     n_col: int, 
                     rank: int):
         X = torch.randn(n_row, rank)
-        Y = torch.randn(rank, n_col)
+        Y = torch.randn(n_col, rank)
         return cls(X,Y)
     
     """
@@ -35,8 +37,8 @@ class L2Model(nn.Module):
                      U: torch.Tensor, 
                      V: torch.Tensor, 
                      device: str="cpu"):
-        assert U.shape[1] == V.shape[0], "U & V must be dimensions (n,r) & (r,n), respectively, r: emb. rank, n: # of nodes"
-        model = cls(U, V, inference_only=True) # we only learn S in A = USV^T
+        assert U.shape == V.shape, "U & V must be dimensions (n,r) & (n,r), respectively, r: emb. rank, n: # of nodes"
+        model = cls(U, V, device=device, inference_only=True) # we only learn S in A = USV^T
         S = torch.randn(U.shape[1]).to(device)
         model.S = nn.Parameter(S)
         return model
@@ -51,20 +53,25 @@ class L2Model(nn.Module):
                       U: torch.Tensor, 
                       V: torch.Tensor, 
                       S: torch.Tensor):
-        S_inv_sqrt = S**(-1/2)
-        X = S_inv_sqrt @ U
-        Y = S_inv_sqrt @ V.T
+        S_inv_sqrt = torch.diag(torch.sqrt(F.softplus(S)) ** (-1))
+        X = U @ S_inv_sqrt
+        Y = V @ S_inv_sqrt
         return cls(X,Y)
 
-    def reconstruct(self):
+    # ? multi-dimensional scaling for L2 model instead? 
+    def reconstruct(self): 
         if self.S is not None:
-            _S = torch.diag(self.S)
-            norms = torch.norm((self.X@_S)[:,None] - (self.Y.T@_S), p=2, dim=-1)
+            # _S = softplus(_S) for nonneg # _S = _S**(1/2) as it is mult on both matrices
+            _S = torch.diag(torch.sqrt(F.softplus(self.S)))
+            norms = torch.norm((self.X@_S)[:,None] - (self.Y@_S), p=2, dim=-1)
         else:
-            norms = torch.norm(self.X[:,None] - self.Y.T, p=2, dim=-1)
+            norms = torch.norm(self.X[:,None] - self.Y, p=2, dim=-1)
         A_hat = - norms + self.beta
         return A_hat
 
     def forward(self):
+        if self.S is not None: # during pretraining, i.e. SVD target
+            return self.X, self.Y, self.S
+        
         return self.X, self.Y, self.beta
     

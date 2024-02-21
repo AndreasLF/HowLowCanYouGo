@@ -1,3 +1,4 @@
+import pdb
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -61,9 +62,10 @@ class Trainer:
             model = self.model_class.init_random(adj.size(0), adj.size(1), rank).to(self.device)
         elif self.model_init == 'svd':
             # raise Exception(f"initialization ({self.model_init}) is not yet fully implemented!")
-            U,_,V = torch.linalg.svd(adj)
-            U = U[:,:rank] # ? truncate to dim = rank
-            V = V[:,:rank].T # ? truncate to dim = rank
+            # U,_,V = torch.linalg.svd(adj) # SVDS -> economy-version, i.e. top k eigencomponents
+            # U = U[:,:rank] # ? truncate to dim = rank
+            # V = V[:,:rank] # ? truncate to dim = rank
+            U,_,V = torch.svd_lowrank(adj, q=rank)
             model = self.model_class.init_pre_svd(U, V, device=self.device)
         elif self.model_init == 'load':
             model_params = torch.load(self.load_ckpt)

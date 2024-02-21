@@ -37,3 +37,13 @@ datasets:
 
 run_experiments:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/run_experiments.py $(ARGS)
+
+pretrain_svd_l2:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type L2 --rank 32 --train-mode pretrain --optim-type adam --lr 1e-1 --num-epochs 3_000 --save-ckpt results/svd-init-l2.pt --device cuda
+pretrain_svd_lpca:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type LPCA --rank 32 --train-mode pretrain --optim-type adam --lr 1e-2 --num-epochs 3_000 --save-ckpt results/svd-init-lpca.pt --device cuda
+
+init_from_svd_l2:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type L2 --rank 32 --train-mode reconstruct-from-svd --optim-type adam --lr 1e-1 --num-epochs 3_000 --load-ckpt results/svd-init-l2.pt --save-ckpt results/pretrained-test-l2.pt --device cuda
+init_from_svd_lpca:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type LPCA --rank 32 --train-mode reconstruct-from-svd --optim-type adam --lr 1e-2 --num-epochs 3_000 --load-ckpt results/svd-init-lpca.pt --save-ckpt results/pretrained-test-lpca.pt --device cuda
