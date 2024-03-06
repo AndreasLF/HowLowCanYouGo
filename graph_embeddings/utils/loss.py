@@ -31,14 +31,3 @@ def L2_loss(A_hat, adj_s):
 #     loss = (torch.logaddexp(zero,-z)).sum()
 
 #     return loss
-
-# ? dropped, for now
-# def L2_squared_loss(logits, adj_s):
-#     X,Y,beta = logits
-#     sq_norms = torch.norm(X[:,None] - Y.T, p=2, dim=-1) ** 2
-#     z = adj_s * (beta - sq_norms)
-
-#     zero = torch.zeros_like(z)
-#     loss = (torch.logaddexp(zero,-z)).sum()
-
-#     return loss
