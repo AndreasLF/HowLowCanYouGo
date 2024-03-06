@@ -25,6 +25,8 @@ if __name__ == '__main__':
     parser.add_argument('--load-ckpt', type=str, default='none', help='path to load model checkpoint (ckpt) from (default: %(default)s)')
     parser.add_argument('--save-ckpt', type=str, default='results/model.pt', help='path to save model checkpoint (ckpt) to (default: %(default)s)')
     parser.add_argument('--data', type=str, default='Cora', choices=['Cora', 'Citeseer', 'Facebook', 'Pubmed'], help='dataset to train on (default: %(default)s)')
+    parser.add_argument('--model-init', type=str, default='random', choices=['random', 'load', 'svd', 'loadsvd', 'mds'], help='how to initialize the model (default: %(default)s)')
+
 
     args = parser.parse_args()
     print('# Options')
@@ -36,13 +38,15 @@ if __name__ == '__main__':
     # Load and prepare your data
     adj = torch.load(f'./data/adj_matrices/{args.data}.pt').to(device)
 
-    if args.train_mode == 'reconstruct':
-        model_init = 'random' if args.load_ckpt == 'none' else 'load'
-    elif args.train_mode == 'pretrain':
-        model_init = 'svd' if args.load_ckpt == 'none' else 'loadsvd'
-    elif args.train_mode == 'reconstruct-from-svd':
-        assert args.load_ckpt != 'none', "must provide .pt-file containing svd params for this initialization"
-        model_init = 'loadsvd'
+    model_init = args.model_init
+
+    # if args.train_mode == 'reconstruct':
+    #     model_init = 'random' if args.load_ckpt == 'none' else 'load'
+    # elif args.train_mode == 'pretrain':
+    #     model_init = 'svd' if args.load_ckpt == 'none' else 'loadsvd'
+    # elif args.train_mode == 'reconstruct-from-svd':
+    #     assert args.load_ckpt != 'none', "must provide .pt-file containing svd params for this initialization"
+    #     model_init = 'loadsvd'
 
     model = LPCAModel if args.model_type == 'LPCA' else L2Model
     loss_fn = lpca_loss if args.model_type == 'LPCA' else L2_loss

@@ -56,7 +56,7 @@ class Trainer:
             U (np.ndarray): The left singular vectors
             V (np.ndarray): The right singular vectors
         """
-
+        
         adj = self.adj.to(self.device)
         if self.model_init == 'random':
             model = self.model_class.init_random(adj.size(0), adj.size(1), rank).to(self.device)
@@ -67,6 +67,9 @@ class Trainer:
             # V = V[:,:rank] # ? truncate to dim = rank
             U,_,V = torch.svd_lowrank(adj, q=rank)
             model = self.model_class.init_pre_svd(U, V, device=self.device)
+        elif self.model_init == 'mds':
+            model = self.model_class.init_pre_mds(A=adj, target_dim=rank, device=self.device)
+
         elif self.model_init == 'load':
             model_params = torch.load(self.load_ckpt)
             model = self.model_class(*model_params).to(self.device)

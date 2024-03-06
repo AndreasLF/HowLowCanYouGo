@@ -43,6 +43,29 @@ class L2Model(nn.Module):
         model.S = nn.Parameter(S)
         return model
     
+    @classmethod
+    def init_pre_mds(cls,
+                     A: torch.Tensor,
+                     target_dim: int,
+                     device: str="cpu"):
+        dist = 1. - A
+        n, _ = dist.size()
+
+        C = torch.eye(n) - torch.ones((n, n)) / n        
+        B = C @ dist @ C
+
+        eigenvalues, eigenvectors = torch.linalg.eigh(B)
+        idx = eigenvalues.argsort(descending=True)
+        eigenvalues = eigenvalues[idx]
+        eigenvectors = eigenvectors[:, idx]
+
+        L = torch.diag(torch.sqrt(eigenvalues[:target_dim]))
+        V = eigenvectors[:, :target_dim]
+
+        Y = V @ L
+        X = Y
+        return cls(X=X, Y=Y, device=device, inference_only=True)
+
     """
     Method 2 of 2. [together with init_pre_svd]
     Initialize a model for further training, using U, V and learned S to 
