@@ -68,7 +68,7 @@ class Trainer:
             U,_,V = torch.svd_lowrank(adj, q=rank)
             model = self.model_class.init_pre_svd(U, V, device=self.device)
         elif self.model_init == 'mds':
-            model = self.model_class.init_pre_mds(A=adj, target_dim=rank, device=self.device)
+            model = self.model_class.init_pre_mds(A=adj, rank=rank, device=self.device)
 
         elif self.model_init == 'load':
             model_params = torch.load(self.load_ckpt)
@@ -146,6 +146,8 @@ class Trainer:
                     loss = loss_fn(A_hat, adj_s)  # Ensure lpca_loss is compatible with PyTorch and returns a scalar tensor
                     loss.backward()
                     optimizer.step()
+                    if epoch % 1000 == 0:
+                        pdb.set_trace()
 
                 # Compute and print the Frobenius norm for diagnostics
                 with torch.no_grad():  # Ensure no gradients are computed in this block

@@ -15,7 +15,7 @@ class L2Model(nn.Module):
         Y = Y.to(device)
         self.X = nn.Parameter(X) if not inference_only else X
         self.Y = nn.Parameter(Y) if not inference_only else Y
-        self.beta = nn.Parameter(torch.randn(1).to(device)) # scalar free parameter bias term
+        self.beta = nn.Parameter(torch.randn(1).to(device)) # (scalar) free parameter bias term
         self.S = None # ! only set if pretraining on SVD objective
 
     @classmethod
@@ -23,6 +23,10 @@ class L2Model(nn.Module):
                     n_row: int, 
                     n_col: int, 
                     rank: int):
+        """
+        Initializes the low rank approximation tensors,
+            with values drawn from std. gaussian distribution.
+        """
         X = torch.randn(n_row, rank)
         Y = torch.randn(n_col, rank)
         return cls(X,Y)
@@ -46,25 +50,26 @@ class L2Model(nn.Module):
     @classmethod
     def init_pre_mds(cls,
                      A: torch.Tensor,
-                     target_dim: int,
+                     rank: int,
                      device: str="cpu"):
+        n, _ = A.size()
+
         dist = 1. - A
-        n, _ = dist.size()
+        C = torch.eye(n).to(device) - torch.ones((n, n)).to(device) / n        
+        B = - C @ torch.square(dist) @ C
 
-        C = torch.eye(n) - torch.ones((n, n)) / n        
-        B = C @ dist @ C
-
-        eigenvalues, eigenvectors = torch.linalg.eigh(B)
+        eigenvalues, eigenvectors = torch.linalg.eigh(B) # eigh because B symmetric
         idx = eigenvalues.argsort(descending=True)
         eigenvalues = eigenvalues[idx]
         eigenvectors = eigenvectors[:, idx]
 
-        L = torch.diag(torch.sqrt(eigenvalues[:target_dim]))
-        V = eigenvectors[:, :target_dim]
+        L = torch.diag(torch.sqrt(eigenvalues[:rank]))
+        E = eigenvectors[:, :rank]
 
-        Y = V @ L
-        X = Y
-        return cls(X=X, Y=Y, device=device, inference_only=True)
+        Y = E @ L
+        # X = Y.detach().clone() 
+        X = Y.detach().clone() + torch.randn_like(Y) * 1e-1 # randn for breaking symmetry - otherwise identical gradient updates are computed at each training step.
+        return cls(X=X, Y=Y, device=device, inference_only=False)
 
     """
     Method 2 of 2. [together with init_pre_svd]
@@ -82,13 +87,15 @@ class L2Model(nn.Module):
         return cls(X,Y)
 
     # ? multi-dimensional scaling for L2 model instead? 
-    def reconstruct(self): 
+    def reconstruct(self):
         if self.S is not None:
             # _S = softplus(_S) for nonneg # _S = _S**(1/2) as it is mult on both matrices
             _S = torch.diag(torch.sqrt(F.softplus(self.S)))
             norms = torch.norm((self.X@_S)[:,None] - (self.Y@_S), p=2, dim=-1)
+            # norms = torch.cdist(self.X@_S, self.Y@_S, p=2)
         else:
-            norms = torch.norm(self.X[:,None] - self.Y, p=2, dim=-1)
+            norms = torch.norm(self.X[:,None] - self.Y, p=2, dim=-1) # ? seems like better training than with cdist, why?
+            # norms = torch.cdist(self.X, self.Y, p=2)
         A_hat = - norms + self.beta
         return A_hat
 
