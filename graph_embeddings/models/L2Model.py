@@ -1,4 +1,3 @@
-import pdb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -11,6 +10,7 @@ class L2Model(nn.Module):
                  device: str="cpu",
                  inference_only: bool=False):
         super(L2Model, self).__init__()
+        self.device = device
         X = X.to(device)
         Y = Y.to(device)
         self.X = nn.Parameter(X) if not inference_only else X
@@ -22,14 +22,15 @@ class L2Model(nn.Module):
     def init_random(cls, 
                     n_row: int, 
                     n_col: int, 
-                    rank: int):
+                    rank: int,
+                    **kwargs):
         """
         Initializes the low rank approximation tensors,
             with values drawn from std. gaussian distribution.
         """
         X = torch.randn(n_row, rank)
         Y = torch.randn(n_col, rank)
-        return cls(X,Y)
+        return cls(X,Y, **kwargs)
     
     """
     Method 1 of 2. [together with init_post_svd]
@@ -40,9 +41,10 @@ class L2Model(nn.Module):
     def init_pre_svd(cls, 
                      U: torch.Tensor, 
                      V: torch.Tensor, 
-                     device: str="cpu"):
+                     device: str="cpu",
+                     **kwargs):
         assert U.shape == V.shape, "U & V must be dimensions (n,r) & (n,r), respectively, r: emb. rank, n: # of nodes"
-        model = cls(U, V, device=device, inference_only=True) # we only learn S in A = USV^T
+        model = cls(U, V, device=device, inference_only=True, **kwargs) # we only learn S in A = USV^T
         S = torch.randn(U.shape[1]).to(device)
         model.S = nn.Parameter(S)
         return model
@@ -51,7 +53,8 @@ class L2Model(nn.Module):
     def init_pre_mds(cls,
                      A: torch.Tensor,
                      rank: int,
-                     device: str="cpu"):
+                     device: str="cpu",
+                     **kwargs):
         n, _ = A.size()
 
         dist = 1. - A
@@ -68,8 +71,8 @@ class L2Model(nn.Module):
 
         Y = E @ L
         # X = Y.detach().clone() 
-        X = Y.detach().clone() + torch.randn_like(Y) * 1e-1 # randn for breaking symmetry - otherwise identical gradient updates are computed at each training step.
-        return cls(X=X, Y=Y, device=device, inference_only=False)
+        X = Y.detach().clone() + torch.randn_like(Y) * 1e-1      # ? randn for breaking symmetry - otherwise identical gradient updates are computed at each training step.
+        return cls(X=X, Y=Y, device=device, inference_only=False, **kwargs)
 
     """
     Method 2 of 2. [together with init_pre_svd]
@@ -80,11 +83,12 @@ class L2Model(nn.Module):
     def init_post_svd(cls, 
                       U: torch.Tensor, 
                       V: torch.Tensor, 
-                      S: torch.Tensor):
+                      S: torch.Tensor,
+                      **kwargs):
         S_inv_sqrt = torch.diag(torch.sqrt(F.softplus(S)) ** (-1))
         X = U @ S_inv_sqrt
         Y = V @ S_inv_sqrt
-        return cls(X,Y)
+        return cls(X,Y,**kwargs)
 
     # ? multi-dimensional scaling for L2 model instead? 
     def reconstruct(self):

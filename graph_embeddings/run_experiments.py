@@ -35,7 +35,7 @@ def run_experiment(config: Config, device: str = 'cpu', results_folder: str = 'r
         # If rank_range is specified, search for the optimal rank
         rank_range = config.get('rank_range')
         if rank_range:
-            trainer.find_optimal_rank(rank_range['min'], rank_range['max'], lr=config.get('lr'), early_stop_patience=config.get('early_stop_patience'), experiment_name=experiment_name)
+            trainer.find_optimal_rank2(rank_range['min'], rank_range['max'], lr=config.get('lr'), early_stop_patience=config.get('early_stop_patience'), experiment_name=experiment_name)
 
 def main():
     parser = argparse.ArgumentParser()

@@ -4,6 +4,8 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 import os
+from graph_embeddings.models.L2Model import L2Model
+from graph_embeddings.models.LPCAModel import LPCAModel
 
 from graph_embeddings.utils.logger import JSONLogger
 
@@ -45,7 +47,12 @@ class Trainer:
         clipped_logits = torch.clip(logits, min=0, max=1)
         return torch.linalg.norm(clipped_logits - adj) / torch.linalg.norm(adj)
 
-    def train(self, rank, lr=0.01, early_stop_patience=None, save_path=None):
+    def train(self, 
+              rank, 
+              model: L2Model|LPCAModel|None = None, 
+              lr: float = 0.01, 
+              early_stop_patience: float = None, 
+              save_path: str = None):
         """ Train the model using the given optimizer and loss function.
         
         Args:
@@ -53,31 +60,32 @@ class Trainer:
             print_loss_interval (int): The interval at which the loss is printed. Default is 10.
         
         Returns:
-            U (np.ndarray): The left singular vectors
-            V (np.ndarray): The right singular vectors
+            U (torch.Tensor): The left singular vectors
+            V (torch.Tensor): The right singular vectors
         """
         
         adj = self.adj.to(self.device)
-        if self.model_init == 'random':
-            model = self.model_class.init_random(adj.size(0), adj.size(1), rank).to(self.device)
-        elif self.model_init == 'svd':
-            # raise Exception(f"initialization ({self.model_init}) is not yet fully implemented!")
-            # U,_,V = torch.linalg.svd(adj) # SVDS -> economy-version, i.e. top k eigencomponents
-            # U = U[:,:rank] # ? truncate to dim = rank
-            # V = V[:,:rank] # ? truncate to dim = rank
-            U,_,V = torch.svd_lowrank(adj, q=rank)
-            model = self.model_class.init_pre_svd(U, V, device=self.device)
-        elif self.model_init == 'mds':
-            model = self.model_class.init_pre_mds(A=adj, rank=rank, device=self.device)
+        if model is None:
+            if self.model_init == 'random':
+                model = self.model_class.init_random(adj.size(0), adj.size(1), rank, device=self.device)#.to(self.device)
+            elif self.model_init == 'svd':
+                # raise Exception(f"initialization ({self.model_init}) is not yet fully implemented!")
+                # U,_,V = torch.linalg.svd(adj) # SVDS -> economy-version, i.e. top k eigencomponents
+                # U = U[:,:rank] # ? truncate to dim = rank
+                # V = V[:,:rank] # ? truncate to dim = rank
+                U,_,V = torch.svd_lowrank(adj, q=rank)
+                model = self.model_class.init_pre_svd(U, V, device=self.device)
+            elif self.model_init == 'mds':
+                model = self.model_class.init_pre_mds(A=adj, rank=rank, device=self.device)
 
-        elif self.model_init == 'load':
-            model_params = torch.load(self.load_ckpt)
-            model = self.model_class(*model_params).to(self.device)
-        elif self.model_init == 'loadsvd':
-            model_params = torch.load(self.load_ckpt)
-            model = self.model_class.init_post_svd(*model_params).to(self.device)
-        else:
-            raise Exception(f"selected model initialization ({self.model_init}) is not currently implemented")
+            elif self.model_init == 'load':
+                model_params = torch.load(self.load_ckpt)
+                model = self.model_class(*model_params, device=self.device).to(self.device)
+            elif self.model_init == 'loadsvd':
+                model_params = torch.load(self.load_ckpt)
+                model = self.model_class.init_post_svd(*model_params,device=self.device).to(self.device)
+            else:
+                raise Exception(f"selected model initialization ({self.model_init}) is not currently implemented")
         loss_fn = self.loss_fn
         optim_type = self.optim_type
         num_epochs = self.num_epochs
@@ -146,14 +154,14 @@ class Trainer:
                     loss = loss_fn(A_hat, adj_s)  # Ensure lpca_loss is compatible with PyTorch and returns a scalar tensor
                     loss.backward()
                     optimizer.step()
-                    if epoch % 1000 == 0:
-                        pdb.set_trace()
+                    # if epoch % 1000 == 0:
+                    #     pdb.set_trace()
 
                 # Compute and print the Frobenius norm for diagnostics
                 with torch.no_grad():  # Ensure no gradients are computed in this block
                     A_hat = model.reconstruct()
                     frob_error_norm = self.calc_frob_error_norm(A_hat, adj)
-                    pbar.set_description(f"epoch={epoch}, loss={loss:.1f} Frobenius error: {frob_error_norm}")
+                    pbar.set_description(f"{model.__class__.__name__} rank={rank}, epoch={epoch}, loss={loss:.1f} Frob. err.: {frob_error_norm:.4f}")
 
                 # Log metrics to all loggers
                 metrics = {'epoch': epoch, 'loss': loss.item(), 'frob_error_norm': frob_error_norm.item()}
@@ -275,6 +283,81 @@ class Trainer:
                 print(f'Full reconstruction at rank {current_rank}\n')
                 optimal_rank = current_rank  # Update the optimal rank if reconstruction is within the threshold
                 upper_bound = current_rank - 1  # Try to find a smaller rank
+            else:
+                print(f'Full reconstruction NOT found for rank {current_rank}\n')
+                lower_bound = current_rank + 1
+        print()
+        return optimal_rank
+    
+    def find_optimal_rank2(self, min_rank, max_rank, lr=0.01, early_stop_patience=None, experiment_name=None, results_folder='results'):
+        """
+        Find the optimal rank for the model by starting on a 
+            high guess (i.e. upper bound) at the optimal rank, followed 
+            by a binary search in the range [lower, upper]
+
+        Args:
+            min_rank (int): The minimum rank
+            max_rank (int): The maximum rank
+        
+        Returns:
+            optimal_rank (int): The optimal rank
+        
+        """
+        lower_bound = min_rank
+        upper_bound = max_rank
+        optimal_rank = upper_bound  # Assume the worst case initially
+        thr = self.threshold
+
+        print('-'*50)
+        print(f'Finding optimal rank between {min_rank} and {max_rank}')
+        print('-'*50)
+
+        # 1. (optional) pretrain on MDS or SVD objective
+        # TODO
+        
+        # 2. Train initial high guess
+        save_path = None # ! just ignore initial model
+        model = self.train(max_rank, lr=lr, early_stop_patience=early_stop_patience, save_path=save_path)
+        X,Y,beta = model.forward()
+        device = model.device
+        svd_target = torch.concatenate([X,Y], dim=0)
+        
+        while lower_bound <= upper_bound:
+            current_rank = (lower_bound + upper_bound) // 2
+            print(f'Training model with rank {current_rank}')
+
+            # Create a save path for the model
+            if experiment_name:
+                save_path = self._make_model_save_path(experiment_name, results_folder=results_folder, rank=current_rank, model_type=self.model_class.__name__)
+            else:
+                save_path = None
+
+            # 3. Perform SVD estimate from higher into lower rank approx.
+                # i.e.
+                # [U,S,V]=Svd(Concat(X,Y))
+                # S*V trunkeres
+                # Vx og Vy tages ud som nye estimater af X og Y med reduceret dimension.
+            
+            _,_,V = torch.svd_lowrank(svd_target, q=current_rank)
+            model = model.__class__(X@V, Y@V, device=device)
+
+            # 4. Train the model
+            model = self.train(current_rank, model=model, lr=lr, early_stop_patience=early_stop_patience, save_path=save_path)
+
+            # Calculate the Frobenius error
+            logits = model.reconstruct()
+            frob_error = self.calc_frob_error_norm(logits, self.adj)
+
+            # Check if the reconstruction is within the threshold
+            if frob_error <= thr:
+                print(f'Full reconstruction at rank {current_rank}\n')
+                optimal_rank = current_rank  # Update the optimal rank if reconstruction is within the threshold
+                upper_bound = current_rank - 1  # Try to find a smaller rank
+                
+                # compute new svd_target for next iteration
+                X,Y,beta = model.forward()
+                device = model.device
+                svd_target = torch.concatenate([X,Y], dim=0)
             else:
                 print(f'Full reconstruction NOT found for rank {current_rank}\n')
                 lower_bound = current_rank + 1
