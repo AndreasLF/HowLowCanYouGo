@@ -49,8 +49,16 @@ init_from_svd_lpca:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type LPCA --rank 32 --train-mode reconstruct-from-svd --optim-type adam --lr 1e-2 --num-epochs 3_000 --load-ckpt results/svd-init-lpca.pt --save-ckpt results/pretrained-test-lpca.pt --device cuda
 
 
-init_from_mds_l2:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type L2 --rank 64 --optim-type adam --lr 1e-1 --num-epochs 3_000 --save-ckpt results/pretrained-test-l2.pt --device cuda --model-init mds
+MDS_RANK = 8
+MDS_LR = 1e-1
 
+init_from_mds_l2:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type L2 --rank $(MDS_RANK) \
+		--optim-type adam --lr $(MDS_LR) --num-epochs 3_000 \
+		--save-ckpt results/mds-test-l2.pt --device cuda \
+		--model-init mds
 init_from_rand_l2:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type L2 --rank 64 --optim-type adam --lr 1e-1 --num-epochs 3_000 --save-ckpt results/pretrained-test-l2.pt --device cuda --model-init random
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type L2 --rank $(MDS_RANK) \
+		--optim-type adam --lr $(MDS_LR) --num-epochs 3_000 \
+		--save-ckpt results/mds-test-l2.pt --device cuda \
+		--model-init random
