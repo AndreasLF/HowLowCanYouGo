@@ -1,6 +1,8 @@
+import pdb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from graph_embeddings.utils.mds_utils import pairwise_jaccard_similarity, norm_and_rescale
 
 # Euclidean embedding model
 class L2Model(nn.Module):
@@ -57,21 +59,32 @@ class L2Model(nn.Module):
                      **kwargs):
         n, _ = A.size()
 
-        dist = 1. - A
-        C = torch.eye(n).to(device) - torch.ones((n, n)).to(device) / n        
-        B = - C @ torch.square(dist) @ C
+        C = (torch.eye(n) - torch.ones((n, n)) / n).to(device)
 
-        eigenvalues, eigenvectors = torch.linalg.eigh(B) # eigh because B symmetric
-        idx = eigenvalues.argsort(descending=True)
-        eigenvalues = eigenvalues[idx]
-        eigenvectors = eigenvectors[:, idx]
+        def dis_measure(adj):
+            return 1. - adj ## simple measure
+            # return 1 - pairwise_jaccard_similarity(adj)
+        
+        disc = dis_measure(A)
+        disr = dis_measure(A.t())
 
-        L = torch.diag(torch.sqrt(eigenvalues[:rank]))
-        E = eigenvectors[:, :rank]
+        def mds_helper(dis):
+            B = -.5 * C @ torch.square(dis) @ C
 
-        Y = E @ L
-        # X = Y.detach().clone() 
-        X = Y.detach().clone() + torch.randn_like(Y) * 1e-1      # ? randn for breaking symmetry - otherwise identical gradient updates are computed at each training step.
+            eigenvalues, eigenvectors = torch.linalg.eigh(B) # eigh because B symmetric
+            idx = eigenvalues.argsort(descending=True)
+            eigenvalues = eigenvalues[idx]
+            eigenvectors = eigenvectors[:, idx]
+
+            L = torch.diag(torch.sqrt(eigenvalues[:rank]))
+            E = eigenvectors[:, :rank]
+            return E,L
+
+        Er,Lr = mds_helper(disr)
+        Ec,Lc = mds_helper(disc)
+        X = norm_and_rescale( Er@Lr )
+        Y = norm_and_rescale( Ec@Lc )
+        pdb.set_trace()
         return cls(X=X, Y=Y, device=device, inference_only=False, **kwargs)
 
     """
