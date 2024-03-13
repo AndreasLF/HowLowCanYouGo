@@ -1,3 +1,4 @@
+import pdb
 import torch
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.models.LPCAModel import LPCAModel
@@ -8,13 +9,14 @@ import argparse
 # import loggers
 import wandb
 from graph_embeddings.utils.logger import JSONLogger
+from graph_embeddings.utils.load_data import load_adj
 
 from utils.config import Config
 
 def run_experiment(config: Config, device: str = 'cpu', results_folder: str = 'results', experiment_name: str = 'experiment', dev=False):
     # Load and prepare your data
     dataset_path = config.get("dataset_path")
-    adj = torch.load(dataset_path).to(config.get('device'))
+    adj = load_adj(dataset_path).to(config.get('device'))
     
     model_types = config.get('model_types')
 
@@ -22,20 +24,27 @@ def run_experiment(config: Config, device: str = 'cpu', results_folder: str = 'r
         print(f"# Training {model_type} model...")
 
         # Determine the model and loss function based on config
-        model = LPCAModel if model_type == 'LPCA' else L2Model
+        model_class = LPCAModel if model_type == 'LPCA' else L2Model
         loss_fn = lpca_loss if model_type == 'LPCA' else L2_loss
         
-
+        load_ckpt = config.get('load_ckpt')
+        model_init = config.get('model_init') or 'random'
+        
         loggers = [JSONLogger] if dev else [JSONLogger, wandb]
         # Initialize the trainer
-        trainer = Trainer(adj=adj, model_class=model, loss_fn=loss_fn, 
+        trainer = Trainer(adj=adj, model_class=model_class, loss_fn=loss_fn, model_init=model_init,
                         threshold=1e-7, num_epochs=config.get("num_epochs"), optim_type=config.get('optim_type'), 
-                        device=device, max_eval=config.get('max_eval'), loggers=loggers, dataset_path=dataset_path, save_ckpt=results_folder)
+                        device=device, max_eval=config.get('max_eval'), loggers=loggers, dataset_path=dataset_path, 
+                        save_ckpt=results_folder, load_ckpt=load_ckpt)
         
         # If rank_range is specified, search for the optimal rank
         rank_range = config.get('rank_range')
         if rank_range:
-            trainer.find_optimal_rank2(rank_range['min'], rank_range['max'], lr=config.get('lr'), early_stop_patience=config.get('early_stop_patience'), experiment_name=experiment_name)
+            trainer.find_optimal_rank2(rank_range['min'], 
+                                       rank_range['max'], 
+                                       lr=config.get('lr'), 
+                                       early_stop_patience=config.get('early_stop_patience'), 
+                                       experiment_name=experiment_name)
 
 def main():
     parser = argparse.ArgumentParser()
