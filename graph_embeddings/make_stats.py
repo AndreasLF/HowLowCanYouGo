@@ -55,6 +55,12 @@ def get_stats(adj):
 
 if __name__ == "__main__":
     
+
+    import argparse
+    parser = argparse.ArgumentParser(description='Arguments for make_stats.py')
+    parser.add_argument('--print-latex', action='store_true', help='Print the stats in LaTeX format')
+    args = parser.parse_args()
+
     cfg = Config("configs/config.yaml")
 
     datasets = cfg.get("data", "dataset_src").keys()
@@ -66,7 +72,7 @@ if __name__ == "__main__":
 
     # Try to load the existing CSV file, if it doesn't exist, create an empty DataFrame
     try:
-        existing_df = pd.read_csv("adj_matrix_stats.csv")
+        existing_df = pd.read_csv(f"{stats_path}/adj_matrix_stats.csv")
     except FileNotFoundError:
         existing_df = pd.DataFrame()
 
@@ -92,9 +98,41 @@ if __name__ == "__main__":
         else:
             df.to_csv(f"{stats_path}/adj_matrix_stats.csv", mode='a', header=False, index=False)  # Append without header if file already exists
 
-        # Optionally, you can read the CSV again to update the existing_df variable
+        # Optionally, read the CSV again to update the existing_df variable
         existing_df = pd.read_csv(f"{stats_path}/adj_matrix_stats.csv")
 
     # Load and print the CSV file content to verify
     df_loaded = pd.read_csv(f"{stats_path}/adj_matrix_stats.csv")
     print(df_loaded.head())
+
+
+    if args.print_latex:
+
+        keep_columns = ["Dataset", "num_nodes", "average_degree", 
+                        "95_percentile_degree", "num_connected_components", "total_triangles"]
+
+        df_loaded = df_loaded[keep_columns]
+        # rename columns
+        df_loaded.rename(columns={"num_nodes": "Nodes", "average_degree": "Avg. Degree", 
+                                 "95_percentile_degree": "95th Percentile Degree", 
+                                 "num_connected_components": "Connected Components", 
+                                 "total_triangles": "Total Triangles"}, inplace=True)
+
+
+        # Add two empty columns for the bold rows
+        df_loaded["EFD"] = ""
+        df_loaded["Search start"] = ""
+
+
+        # sort dataframe by Nodes
+        df_loaded.sort_values(by="Nodes", inplace=True)
+
+        # dont't use toprule, midrule, bottomrule, instead use \hline
+        latex_code = df_loaded.to_latex(index=False, float_format="%.2f", column_format="l|ccccc|cc")
+
+        # replace top and bottom rule with \hline
+        latex_code = latex_code.replace("\\toprule", "\\hline")
+        latex_code = latex_code.replace("\\bottomrule", "\\hline")
+        latex_code = latex_code.replace("\\midrule", "\\hline")
+
+        print(latex_code)

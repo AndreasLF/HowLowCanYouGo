@@ -64,4 +64,4 @@ init_from_rand_l2:
 		--model-init random
 
 get_stats:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/make_stats.py
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/make_stats.py --print-latex
