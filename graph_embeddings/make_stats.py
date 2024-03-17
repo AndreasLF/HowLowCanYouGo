@@ -44,7 +44,7 @@ def get_stats(adj):
     return {
         "num_nodes": adj.shape[0],
         "num_edges": num_edges.item(),
-        "average_degree": average_degree,
+        "average_degree": average_degree.item(),
         "95_percentile_degree": percentile_95,
         "density": nx.density(G),
         "num_connected_components": nx.number_connected_components(G),
