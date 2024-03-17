@@ -33,7 +33,7 @@ module load python3/3.11.7
 module load cuda/11.6
 
 # Activate the virtual environment
-source $VENV_PATH
+source ${VENV_PATH}
 # Change to the working directory
-cd $WORKING_DIR
+cd ${WORKING_DIR}
 make run_experiments ARGS="--device cuda --experiment ${EXPERIMENT_NAME}" # This is the line that runs the experiment, experiment name is passed as an argument

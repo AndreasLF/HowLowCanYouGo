@@ -13,7 +13,7 @@ EXPERIMENT_NAME="$1"
 source ./env_vars.sh
 
 # Path to the job script template
-JOB_SCRIPT_TEMPLATE="./jobscript_template.sh"
+JOB_SCRIPT_TEMPLATE="./jobscript_template1.sh"
 
 # Temporary job script file that will be populated with environment variables and the experiment name
 TEMP_JOB_SCRIPT="./jobscript_populated.sh"
