@@ -86,7 +86,6 @@ def get_adjacency_matrix(dataset):
 
     return adj_matrix
 
-
 def save_adjacency_matrix(adj_matrix, file_path):
     """
     Save the adjacency matrix to a file in PyTorch format (.pt)
@@ -95,6 +94,26 @@ def save_adjacency_matrix(adj_matrix, file_path):
     """
     torch.save(adj_matrix, file_path)
     print(f"Adjacency matrix ({adj_matrix.shape}) saved to {file_path}")
+
+def make_toy_dataset(n_tri, cycle=True, self_loops=True):
+    # Create toy graph. Source: https://github.com/schariya/exact-embeddings/blob/master/ExactEmbeddings.ipynb
+    import scipy as sp
+    import numpy as np
+    # Create the toy graph with n_tri triangles
+    tri_block = sp.sparse.coo_matrix([[0,1,1],[1,0,1],[1,1,0]])
+    mat = sp.sparse.block_diag((tri_block,)*n_tri)
+    diag = np.tile([0,0,1], n_tri)[:-1]
+    mat += sp.sparse.diags([diag, diag], [-1,1])
+    if cycle:
+        mat[0,-1] = 1
+        mat[-1,0] = 1
+    if self_loops:
+        mat += sp.sparse.identity(n_tri*3)
+
+    # convert to tensor dense
+    adj_toy = torch.tensor(mat.todense(), dtype=torch.float32)
+    return adj_toy
+
 
 if __name__ == "__main__":
     cfg = Config("configs/config.yaml")
@@ -158,3 +177,13 @@ if __name__ == "__main__":
             new_file_path = f"{adj_matrix_path}/{dataset_name}.pt"
             save_adjacency_matrix(adj_matrix, new_file_path)
 
+        # toy dataset   
+        elif src and "generate-toy-data" in src.lower():
+            src_split = src.split("/")
+            n_triangles = int(src_split[1])
+            # generate a toy dataset
+            toy_dataset = make_toy_dataset(n_triangles)
+            # save adjacency matrix
+            new_file_path = f"{adj_matrix_path}/{dataset_name}.pt"
+            save_adjacency_matrix(toy_dataset, new_file_path)
+        
