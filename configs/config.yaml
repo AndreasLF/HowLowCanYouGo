@@ -20,7 +20,7 @@ data:
     p2p-Gnutella04: SNAPDataset/p2p-Gnutella04
     BlogCatalog: http://leitang.net/code/social-dimension/data/blogcatalog.mat
     Wiki-Vote: SNAPDataset/wiki-Vote
-    ca-GrCq: SNAPDataset/ca-GrQc
+    ca-GrQc: SNAPDataset/ca-GrQc
     # Wikipedia:
     # PPI:
 
