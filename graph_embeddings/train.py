@@ -4,8 +4,11 @@ import argparse
 
 from graph_embeddings.models.LPCAModel import LPCAModel
 from graph_embeddings.models.L2Model import L2Model
+from graph_embeddings.utils.load_data import load_adj
 from graph_embeddings.utils.loss import lpca_loss, L2_loss
 from graph_embeddings.utils.trainer import Trainer
+
+import pdb
 
 # import loggers
 import wandb
@@ -25,6 +28,8 @@ if __name__ == '__main__':
     parser.add_argument('--load-ckpt', type=str, default='none', help='path to load model checkpoint (ckpt) from (default: %(default)s)')
     parser.add_argument('--save-ckpt', type=str, default='results/model.pt', help='path to save model checkpoint (ckpt) to (default: %(default)s)')
     parser.add_argument('--data', type=str, default='Cora', choices=['Cora', 'Citeseer', 'Facebook', 'Pubmed'], help='dataset to train on (default: %(default)s)')
+    parser.add_argument('--model-init', type=str, default='random', choices=['random', 'load', 'svd', 'loadsvd', 'mds'], help='how to initialize the model (default: %(default)s)')
+
 
     args = parser.parse_args()
     print('# Options')
@@ -34,15 +39,9 @@ if __name__ == '__main__':
     device = args.device
 
     # Load and prepare your data
-    adj = torch.load(f'./data/adj_matrices/{args.data}.pt').to(device)
+    adj = load_adj(f'./data/adj_matrices/{args.data}.pt').to(device)
 
-    if args.train_mode == 'reconstruct':
-        model_init = 'random' if args.load_ckpt == 'none' else 'load'
-    elif args.train_mode == 'pretrain':
-        model_init = 'svd' if args.load_ckpt == 'none' else 'loadsvd'
-    elif args.train_mode == 'reconstruct-from-svd':
-        assert args.load_ckpt != 'none', "must provide .pt-file containing svd params for this initialization"
-        model_init = 'loadsvd'
+    model_init = args.model_init
 
     model = LPCAModel if args.model_type == 'LPCA' else L2Model
     loss_fn = lpca_loss if args.model_type == 'LPCA' else L2_loss
@@ -54,7 +53,8 @@ if __name__ == '__main__':
                       device=args.device, max_eval=args.max_eval, loggers=[JSONLogger])#, wandb])
     
     # Train one model model
-    trainer.train(args.rank, lr=args.lr, save_path=args.save_ckpt)
+    model = trainer.init_model(args.rank)
+    trainer.train(args.rank, model=model,lr=args.lr, save_path=args.save_ckpt)
 
     # Find the optimal rank within a range
     # trainer.find_optimal_rank(1, 50)

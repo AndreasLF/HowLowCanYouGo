@@ -2,6 +2,7 @@ import pdb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from graph_embeddings.utils.mds_utils import pairwise_jaccard_similarity, norm_and_rescale
 
 # Euclidean embedding model
 class L2Model(nn.Module):
@@ -11,21 +12,27 @@ class L2Model(nn.Module):
                  device: str="cpu",
                  inference_only: bool=False):
         super(L2Model, self).__init__()
+        self.device = device
         X = X.to(device)
         Y = Y.to(device)
         self.X = nn.Parameter(X) if not inference_only else X
         self.Y = nn.Parameter(Y) if not inference_only else Y
-        self.beta = nn.Parameter(torch.randn(1).to(device)) # scalar free parameter bias term
+        self.beta = nn.Parameter(torch.randn(1).to(device)) # (scalar) free parameter bias term
         self.S = None # ! only set if pretraining on SVD objective
 
     @classmethod
     def init_random(cls, 
                     n_row: int, 
                     n_col: int, 
-                    rank: int):
+                    rank: int,
+                    **kwargs):
+        """
+        Initializes the low rank approximation tensors,
+            with values drawn from std. gaussian distribution.
+        """
         X = torch.randn(n_row, rank)
         Y = torch.randn(n_col, rank)
-        return cls(X,Y)
+        return cls(X,Y, **kwargs)
     
     """
     Method 1 of 2. [together with init_post_svd]
@@ -36,13 +43,50 @@ class L2Model(nn.Module):
     def init_pre_svd(cls, 
                      U: torch.Tensor, 
                      V: torch.Tensor, 
-                     device: str="cpu"):
+                     device: str="cpu",
+                     **kwargs):
         assert U.shape == V.shape, "U & V must be dimensions (n,r) & (n,r), respectively, r: emb. rank, n: # of nodes"
-        model = cls(U, V, device=device, inference_only=True) # we only learn S in A = USV^T
+        model = cls(U, V, device=device, inference_only=True, **kwargs) # we only learn S in A = USV^T
         S = torch.randn(U.shape[1]).to(device)
         model.S = nn.Parameter(S)
         return model
     
+    @classmethod
+    def init_pre_mds(cls,
+                     A: torch.Tensor,
+                     rank: int,
+                     device: str="cpu",
+                     **kwargs):
+        n, _ = A.size()
+
+        C = (torch.eye(n) - torch.ones((n, n)) / n).to(device)
+
+        def dis_measure(adj):
+            return 1. - adj ## simple measure
+            # return 1 - pairwise_jaccard_similarity(adj)
+        
+        disc = dis_measure(A)
+        disr = dis_measure(A.t())
+
+        def mds_helper(dis):
+            B = -.5 * C @ torch.square(dis) @ C
+
+            eigenvalues, eigenvectors = torch.linalg.eigh(B) # eigh because B symmetric
+            idx = eigenvalues.argsort(descending=True)
+            eigenvalues = eigenvalues[idx]
+            eigenvectors = eigenvectors[:, idx]
+
+            L = torch.diag(torch.sqrt(eigenvalues[:rank]))
+            E = eigenvectors[:, :rank]
+            return E,L
+
+        Er,Lr = mds_helper(disr)
+        Ec,Lc = mds_helper(disc)
+        X = norm_and_rescale( Er@Lr )
+        Y = norm_and_rescale( Ec@Lc )
+        pdb.set_trace()
+        return cls(X=X, Y=Y, device=device, inference_only=False, **kwargs)
+
     """
     Method 2 of 2. [together with init_pre_svd]
     Initialize a model for further training, using U, V and learned S to 
@@ -52,20 +96,23 @@ class L2Model(nn.Module):
     def init_post_svd(cls, 
                       U: torch.Tensor, 
                       V: torch.Tensor, 
-                      S: torch.Tensor):
+                      S: torch.Tensor,
+                      **kwargs):
         S_inv_sqrt = torch.diag(torch.sqrt(F.softplus(S)) ** (-1))
         X = U @ S_inv_sqrt
         Y = V @ S_inv_sqrt
-        return cls(X,Y)
+        return cls(X,Y,**kwargs)
 
     # ? multi-dimensional scaling for L2 model instead? 
-    def reconstruct(self): 
+    def reconstruct(self):
         if self.S is not None:
             # _S = softplus(_S) for nonneg # _S = _S**(1/2) as it is mult on both matrices
             _S = torch.diag(torch.sqrt(F.softplus(self.S)))
             norms = torch.norm((self.X@_S)[:,None] - (self.Y@_S), p=2, dim=-1)
+            # norms = torch.cdist(self.X@_S, self.Y@_S, p=2)
         else:
-            norms = torch.norm(self.X[:,None] - self.Y, p=2, dim=-1)
+            norms = torch.norm(self.X[:,None] - self.Y, p=2, dim=-1) # ? seems like better training than with cdist, why?
+            # norms = torch.cdist(self.X, self.Y, p=2)
         A_hat = - norms + self.beta
         return A_hat
 

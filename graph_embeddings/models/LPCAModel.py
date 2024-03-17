@@ -10,6 +10,7 @@ class LPCAModel(nn.Module):
                  device: str="cpu",
                  inference_only: bool=False):
         super(LPCAModel, self).__init__()
+        self.device = device
         if X.shape == Y.shape: Y = Y.t() # 2D transpose
         X = X.to(device)
         Y = Y.to(device)
