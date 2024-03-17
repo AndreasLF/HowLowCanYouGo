@@ -62,3 +62,6 @@ init_from_rand_l2:
 		--optim-type adam --lr $(MDS_LR) --num-epochs 3_000 \
 		--save-ckpt results/mds-test-l2.pt --device cuda \
 		--model-init random
+
+get_stats:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/make_stats.py

@@ -33,4 +33,10 @@ data:
     ca-GrQc: SNAPDataset/ca-GrQc
     # Wikipedia:
     # PPI:
-
+    toy-data-6: generate-toy-data/6 # This is a toy dataset, /20 means 20 triangles
+results:
+  path: ./results
+  logs_path: ./results/logs
+  models_path: ./results/models
+  plots_path: ./results/plots
+  stats_path: ./results/stats
