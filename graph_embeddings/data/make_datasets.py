@@ -8,6 +8,7 @@ from graph_embeddings.utils.config import Config
 import requests 
 import os
 import os.path as osp
+import scipy.io
 
 from torch_geometric.datasets.snap_dataset import read_wiki
 
@@ -71,7 +72,7 @@ def get_data_from_torch_geometric(paper, dataset_name, root='./data/raw'):
 
 def get_adjacency_matrix(dataset):
     """
-    Get the adjacency matrix from the first graph in the dataset
+    Get the adjacency matrix from a PyTorch Geometric dataset
     :param dataset: PyTorch Geometric dataset
     :return: Adjacency matrix as a torch.Tensor
     """
@@ -81,6 +82,7 @@ def get_adjacency_matrix(dataset):
     # make all values in adj_matrix 0 or 1
     adj_matrix[adj_matrix > 0] = 1
     return adj_matrix
+
 
 def save_adjacency_matrix(adj_matrix, file_path):
     """
@@ -126,3 +128,28 @@ if __name__ == "__main__":
             # save adjacency matrix
             new_file_path = f"{adj_matrix_path}/{dataset_name}.pt"
             save_adjacency_matrix(adj_matrix, new_file_path)
+        elif src and ".mat" in src.lower():
+            file_path = f"{raw_path}/{dataset_name}/{dataset_name}.mat"
+            # Check if the file is already downloaded
+            if not os.path.exists(file_path):
+                # remove file_name from the path 
+                file_folder = "/".join(file_path.split("/")[:-1])
+                os.makedirs(file_folder, exist_ok=True)
+
+                # download the file
+                response = requests.get(src)
+
+                with open(file_path, "wb") as f:
+                    f.write(response.content)
+
+            mat = scipy.io.loadmat(file_path)
+
+            network = mat["network"]
+            # convert to adjacency matrix
+            adj_matrix = torch.tensor(network.todense(), dtype=torch.float32)
+            adj_matrix[adj_matrix > 0] = 1
+
+            # save adjacency matrix
+            new_file_path = f"{adj_matrix_path}/{dataset_name}.pt"
+            save_adjacency_matrix(adj_matrix, new_file_path)
+
