@@ -79,8 +79,11 @@ def get_adjacency_matrix(dataset):
     data = dataset[0]  # Assuming we're interested in the first graph in the dataset
     edge_index = data.edge_index
     adj_matrix = to_dense_adj(edge_index)[0]  # Convert edge indices to dense adjacency matrix
+    # Set diagonal to 1
+    adj_matrix = adj_matrix + torch.eye(adj_matrix.shape[0])
     # make all values in adj_matrix 0 or 1
     adj_matrix[adj_matrix > 0] = 1
+
     return adj_matrix
 
 
@@ -147,6 +150,8 @@ if __name__ == "__main__":
             network = mat["network"]
             # convert to adjacency matrix
             adj_matrix = torch.tensor(network.todense(), dtype=torch.float32)
+            adj_matrix = adj_matrix + torch.eye(adj_matrix.shape[0])
+            # make all values in adj_matrix 0 or 1
             adj_matrix[adj_matrix > 0] = 1
 
             # save adjacency matrix
