@@ -1,0 +1,11 @@
+dataset_path: './data/adj_matrices/p2p-Gnutella04.pt'
+model_types: ['L2', 'LPCA']
+num_epochs: 50_000
+optim_type: 'adam'
+max_eval: 25
+model_init: 'random'
+lr: 0.1
+early_stop_patience: 500
+rank_range:
+  min: 1
+  max: 75
