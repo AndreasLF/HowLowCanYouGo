@@ -24,7 +24,7 @@ data:
   dataset_src:
     Cora: PyTorch-Geometric/Planetoid/Cora
     Pubmed: PyTorch-Geometric/Planetoid/PubMed # This is not the same as in Chanpuriya et al. Slight differences in the number of nodes
-    Citiseer: PyTorch-Geometric/Planetoid/CiteSeer
+    Citeseer: PyTorch-Geometric/Planetoid/CiteSeer
     Facebook: Pytorch-Geometric/AttributedGraphDataset/Facebook
     ca-HepPh: SNAPDataset/ca-HepPh # This seems to not have the same amount of nodes as in Chanpuriya et al. although they cited the same source
     p2p-Gnutella04: SNAPDataset/p2p-Gnutella04
