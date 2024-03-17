@@ -16,22 +16,18 @@ def get_stats(adj):
     # Add edges from the sparse matrix
     rows, cols = scipy.sparse.find(adj)[:2]  # Get the non-zero indices
     for row, col in zip(rows, cols):
-        if row != col:
-            G.add_edge(row, col)
+        G.add_edge(row, col)
 
-    # Calculate the number of edges
-    adj_ = adj - torch.eye(adj.shape[0])
-    # calculate number of edges, directed graph
-    num_edges = adj_.sum()
-
-    # Get a list of all degrees
-    degrees = [degree for node, degree in G.degree()]
+    # calculate number of edges, directed graph. 
+    num_edges = adj.sum()
 
     # Calculate the average degree
-    average_degree = np.mean(degrees)
+    degrees = torch.sum(adj)
+    average_degree = degrees / adj.shape[0]
 
-    #Calculate the 95th percentile
-    percentile_95 = np.percentile(degrees, 95)
+    # 95 percentile degree
+    deg_nodes = torch.sum(adj, dim=1)
+    percentile_95 = np.percentile(deg_nodes.numpy(), 95)
 
     # Global Clustering Coefficient
     clustering_coefficient = nx.average_clustering(G)
@@ -45,11 +41,10 @@ def get_stats(adj):
     # Calculate the total number of triangles in the graph
     total_triangles = sum(triangles_per_node.values()) // 3
 
-
     return {
         "num_nodes": adj.shape[0],
         "num_edges": num_edges.item(),
-        "average_degree": average_degree.item(),
+        "average_degree": average_degree,
         "95_percentile_degree": percentile_95,
         "density": nx.density(G),
         "num_connected_components": nx.number_connected_components(G),
@@ -59,11 +54,13 @@ def get_stats(adj):
     }
 
 if __name__ == "__main__":
+    
     cfg = Config("configs/config.yaml")
 
     datasets = cfg.get("data", "dataset_src").keys()
     adj_matrix_path = cfg.get("data", "adj_matrices_path")
     stats_path = cfg.get("results", "stats_path")
+
 
     os.makedirs(stats_path, exist_ok=True)
 
