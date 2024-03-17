@@ -13,14 +13,14 @@ data:
   adj_matrices_path: ./data/adj_matrices
   dataset_src:
     Cora: PyTorch-Geometric/Planetoid/Cora
-    Pubmed: PyTorch-Geometric/Planetoid/PubMed
+    Pubmed: PyTorch-Geometric/Planetoid/PubMed # This is not the same as in Chanpuriya et al. Slight differences in the number of nodes
     Citiseer: PyTorch-Geometric/Planetoid/CiteSeer
     Facebook: Pytorch-Geometric/AttributedGraphDataset/Facebook
-    ca-HePh:
-    p2p-Gnutella04: https://snap.stanford.edu/data/p2p-Gnutella04.html
-    BlogCatalog:
-    Wiki-Vote: https://snap.stanford.edu/data/wiki-Vote.html
-    ca-GrCq: https://snap.stanford.edu/data/ca-GrQc.html
-    Wikipedia:
-    PPI:
+    ca-HepPh: SNAPDataset/ca-HepPh # This seems to not have the same amount of nodes as in Chanpuriya et al. although they cited the same source
+    p2p-Gnutella04: SNAPDataset/p2p-Gnutella04
+    BlogCatalog: http://leitang.net/code/social-dimension/data/blogcatalog.mat
+    Wiki-Vote: SNAPDataset/wiki-Vote
+    ca-GrCq: SNAPDataset/ca-GrQc
+    # Wikipedia:
+    # PPI:
 
