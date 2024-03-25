@@ -50,14 +50,14 @@ class Trainer:
             # if model is None:
             if self.model_init == 'random':
                 assert rank is not None
-                model = self.model_class.init_random(self.adj.size(0), self.adj.size(1), rank, device=self.device)
+                model = self.model_class.init_random(self.adj.size(0), self.adj.size(1), rank).to(self.device)
             elif self.model_init == 'svd':
                 assert rank is not None
                 U,_,V = torch.svd_lowrank(self.adj, q=rank)
-                model = self.model_class.init_pre_svd(U, V, device=self.device)
+                model = self.model_class.init_pre_svd(U, V).to(self.device)
             elif self.model_init == 'mds':
                 assert rank is not None
-                model = self.model_class.init_pre_mds(A=self.adj, rank=rank, device=self.device)
+                model = self.model_class.init_pre_mds(A=self.adj, rank=rank).to(self.device)
             elif self.model_init == 'load':
                 model_params = torch.load(self.load_ckpt,map_location=self.device)
                 model = self.model_class(*model_params)
