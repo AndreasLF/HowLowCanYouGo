@@ -2,7 +2,7 @@ import pdb
 import torch
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.models.LPCAModel import LPCAModel
-from graph_embeddings.utils.loss import lpca_loss, L2_loss
+from graph_embeddings.utils.loss import LogisticLoss, HingeLoss
 from graph_embeddings.utils.trainer import Trainer
 import argparse
 
@@ -13,7 +13,11 @@ from graph_embeddings.utils.load_data import load_adj
 
 from utils.config import Config
 
-def run_experiment(config: Config, device: str = 'cpu', results_folder: str = 'results', experiment_name: str = 'experiment', dev=False):
+def run_experiment(config: Config, 
+                   device: str = 'cpu', 
+                   results_folder: str = 'results', 
+                   experiment_name: str = 'experiment', 
+                   loglevel=2):
     # Load and prepare your data
     dataset_path = config.get("dataset_path")
     adj = load_adj(dataset_path).to(config.get('device'))
@@ -25,22 +29,22 @@ def run_experiment(config: Config, device: str = 'cpu', results_folder: str = 'r
 
         # Determine the model and loss function based on config
         model_class = LPCAModel if model_type == 'LPCA' else L2Model
-        loss_fn = lpca_loss if model_type == 'LPCA' else L2_loss
+        loss_fn = LogisticLoss()
         
         load_ckpt = config.get('load_ckpt')
         model_init = config.get('model_init') or 'random'
         
-        loggers = [JSONLogger] if dev else [JSONLogger, wandb]
+        loggers = {0: [], 1: [JSONLogger], 2: [JSONLogger, wandb]}[loglevel]
         # Initialize the trainer
         trainer = Trainer(adj=adj, model_class=model_class, loss_fn=loss_fn, model_init=model_init,
-                        threshold=1e-7, num_epochs=config.get("num_epochs"),
+                        threshold=1e-10, num_epochs=config.get("num_epochs"),
                         device=device, max_eval=config.get('max_eval'), loggers=loggers, dataset_path=dataset_path, 
                         save_ckpt=results_folder, load_ckpt=load_ckpt)
         
         # If rank_range is specified, search for the optimal rank
         rank_range = config.get('rank_range')
         if rank_range:
-            trainer.find_optimal_rank2(rank_range['min'], 
+            trainer.find_optimal_rank(rank_range['min'], 
                                        rank_range['max'], 
                                        lr=config.get('lr'), 
                                        early_stop_patience=config.get('early_stop_patience'), 
@@ -51,10 +55,11 @@ def main():
     parser.add_argument('--device', type=str, default='cpu')
     parser.add_argument('--all', action='store_true', help='Run all experiments')
     parser.add_argument('--experiment', type=str, default=None, help='Run a specific experiment')
-    parser.add_argument('--dev', action='store_true', help='Run in development mode, i.e. without WANDB logging')
+    parser.add_argument('--loglevel', default="2", choices=["0","1","2"], help='Log level [0: nothing, 1: logs to JSON, 2: logs to JSON and WANDB]')
     
     args = parser.parse_args()
     device = args.device
+    args.loglevel = int(args.loglevel)
 
     main_config_path = 'configs/config.yaml'
     main_config = Config(main_config_path)
@@ -67,12 +72,10 @@ def main():
             print(f"Running experiment {experiment['name']} from config {experiment['config_path']}...")
             exp_config = Config(experiment['config_path'])
 
-            print("="*50)
             # print the whole config
-            print(exp_config)
-            print("="*50)
+            print(f"{'='*50}\n{exp_config}\n{'='*50}")
 
-            run_experiment(config=exp_config, device=device, experiment_name=experiment['name'], dev=args.dev)
+            run_experiment(config=exp_config, device=device, experiment_name=experiment['name'], loglevel=args.loglevel)
     
     else:
         # check if experiment is specified
@@ -96,7 +99,7 @@ def main():
         print(exp_config)
         print("="*50)
 
-        run_experiment(config=exp_config, device=device, experiment_name=exp_name, dev=args.dev)
+        run_experiment(config=exp_config, device=device, experiment_name=exp_name, loglevel=args.loglevel)
 
 if __name__ == '__main__':
     main()

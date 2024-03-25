@@ -47,21 +47,17 @@ class Trainer:
 
     def init_model(self,
                    rank: int|None = None):
-            # if model is None:
             if self.model_init == 'random':
                 assert rank is not None
                 model = self.model_class.init_random(self.adj.size(0), self.adj.size(1), rank).to(self.device)
-            elif self.model_init == 'svd':
-                assert rank is not None
-                U,_,V = torch.svd_lowrank(self.adj, q=rank)
-                model = self.model_class.init_pre_svd(U, V).to(self.device)
-            elif self.model_init == 'mds':
-                assert rank is not None
-                model = self.model_class.init_pre_mds(A=self.adj, rank=rank).to(self.device)
             elif self.model_init == 'load':
                 model_params = torch.load(self.load_ckpt,map_location=self.device)
                 model = self.model_class(*model_params)
-            elif self.model_init == 'loadsvd':
+            elif self.model_init == 'pre-svd':
+                assert rank is not None
+                U,_,V = torch.svd_lowrank(self.adj, q=rank)
+                model = self.model_class.init_pre_svd(U, V).to(self.device)
+            elif self.model_init == 'post-svd':
                 model_params = torch.load(self.load_ckpt,map_location=self.device)
                 model = self.model_class.init_post_svd(*model_params)
             else:
@@ -71,7 +67,7 @@ class Trainer:
 
     def train(self, 
               rank: int, 
-              model: L2Model|LPCAModel|None = None, # TODO currently does nothing
+              model: L2Model|LPCAModel|None = None,
               lr: float = 0.01, 
               early_stop_patience: float = None, 
               save_path: str = None):
@@ -95,7 +91,7 @@ class Trainer:
 
         # ----------- Initialize logging -----------
         # get loss_fn function name
-        loss_fn_name = loss_fn.__name__
+        loss_fn_name = loss_fn.__class__.__name__
         # get self.model_class function name
         model_class_name = self.model_class.__name__
 
@@ -129,7 +125,7 @@ class Trainer:
                 # Forward pass
                 optimizer.zero_grad()
                 A_hat = model.reconstruct() 
-                loss = loss_fn(A_hat, adj_s)  # Ensure lpca_loss is compatible with PyTorch and returns a scalar tensor
+                loss = loss_fn(A_hat, adj_s)
                 loss.backward()
                 optimizer.step()
 
@@ -144,7 +140,7 @@ class Trainer:
                 for logger in self.loggers:
                     logger.log(metrics)
 
-                # Break if Froebenius error is less than 1e-15
+                # Break if Froebenius error is less than threshold
                 if frob_error_norm <= self.threshold:
                     pbar.close()
                     for logger in self.loggers:
@@ -216,68 +212,13 @@ class Trainer:
         experiment_name = f'{experiment_name}.pt'
         return os.path.join(models_folder, experiment_name)
     
-    def find_optimal_rank(self, 
-                          min_rank, 
-                          max_rank, 
-                          lr=0.01, 
+    def find_optimal_rank(self,
+                          min_rank: int, 
+                          max_rank: int,
+                          lr: float = 0.01,
                           early_stop_patience=None, 
                           experiment_name=None, 
                           results_folder='results'):
-        """Find the optimal rank for the model using binary search. 
-
-        Args:
-            min_rank (int): The minimum rank
-            max_rank (int): The maximum rank
-        
-        Returns:
-            optimal_rank (int): The optimal rank
-        
-        """
-
-        lower_bound = min_rank
-        upper_bound = max_rank
-        optimal_rank = upper_bound  # Assume the worst case initially
-        thr = self.threshold
-
-        print('-'*50)
-        print(f'Finding optimal rank between {min_rank} and {max_rank}')
-        print('-'*50)
-
-        while lower_bound <= upper_bound:
-            current_rank = (lower_bound + upper_bound) // 2
-            print(f'Training model with rank {current_rank}')
-
-            # Create a save path for the model
-            if experiment_name:
-                save_path = self._make_model_save_path(experiment_name, results_folder=results_folder, rank=current_rank, model_type=self.model_class.__name__)
-            else:
-                save_path = None
-
-            # Train the model
-            model = self.train(current_rank, lr=lr, early_stop_patience=early_stop_patience, save_path=save_path)
-
-            # Calculate the Frobenius error
-            logits = model.reconstruct()
-            frob_error = self.calc_frob_error_norm(logits, self.adj)
-
-            # Check if the reconstruction is within the threshold
-            if frob_error <= thr:
-                print(f'Full reconstruction at rank {current_rank}\n')
-                optimal_rank = current_rank  # Update the optimal rank if reconstruction is within the threshold
-                upper_bound = current_rank - 1  # Try to find a smaller rank
-            else:
-                print(f'Full reconstruction NOT found for rank {current_rank}\n')
-                lower_bound = current_rank + 1
-        print()
-        return optimal_rank
-    
-    def find_optimal_rank2(self, 
-                           min_rank, 
-                           max_rank, 
-                           lr=0.01, 
-                           early_stop_patience=None, 
-                           experiment_name=None, 
-                           results_folder='results'):
         """
         Find the optimal rank for the model by starting on a 
             high guess (i.e. upper bound) at the optimal rank, followed 
@@ -294,55 +235,55 @@ class Trainer:
         lower_bound = min_rank
         upper_bound = max_rank
         optimal_rank = upper_bound  # Assume the worst case initially
-        thr = self.threshold
 
-        print('-'*50)
-        print(f'Finding optimal rank between {min_rank} and {max_rank}')
-        print('-'*50)
+        print(f'{"="*50}\nFinding optimal rank between {min_rank} and {max_rank}\n{"="*50}')
 
         # 1. Train initial high guess
         save_path = None # ! just ignore initial model
         model = self.init_model(rank=max_rank)
         if self.model_init != 'load':
             model = self.train(max_rank, model=model, lr=lr, early_stop_patience=early_stop_patience, save_path=save_path)
-        X,Y,beta = model.forward()
-        device = model.device
-        svd_target = torch.concatenate([X,Y], dim=0)
-        svd_target -= svd_target.mean(dim=0).unsqueeze(0) # center svd_target -> PCA
         
+        def compute_svd_target(model):
+            X,Y,_ = model.forward()
+            svd_target = torch.concatenate([X,Y], dim=0)
+            return svd_target - svd_target.mean(dim=0).unsqueeze(0) # center svd_target -> PCA
+        svd_target = compute_svd_target(model)
+
         while lower_bound <= upper_bound:
             current_rank = (lower_bound + upper_bound) // 2
             print(f'Training model with rank {current_rank}')
 
             # Create a save path for the model
-            if experiment_name:
-                save_path = self._make_model_save_path(experiment_name, results_folder=results_folder, rank=current_rank, model_type=self.model_class.__name__)
-            else:
-                save_path = None
+            save_path = self._make_model_save_path(experiment_name, 
+                                                    results_folder=results_folder, 
+                                                    rank=current_rank, 
+                                                    model_type=self.model_class.__name__) if experiment_name else None
 
             # 2. Perform SVD estimate from higher into lower rank approx.
             _,_,V = torch.svd_lowrank(svd_target, q=current_rank)
             X,Y = torch.chunk(svd_target, 2, dim=0)
-            model = model.__class__(X@V, Y@V, device=device)
+            model = model.__class__(X@V, Y@V).to(self.device)
 
             # 3. Train new model
-            model = self.train(current_rank, model=model, lr=lr, early_stop_patience=early_stop_patience, save_path=save_path)
+            model = self.train(current_rank, 
+                               model=model, 
+                               lr=lr, 
+                               early_stop_patience=early_stop_patience, 
+                               save_path=save_path)
 
             # Calculate the Frobenius error
             logits = model.reconstruct()
             frob_error = self.calc_frob_error_norm(logits, self.adj)
 
             # Check if the reconstruction is within the threshold
-            if frob_error <= thr:
+            if frob_error <= self.threshold:
                 print(f'Full reconstruction at rank {current_rank}\n')
                 optimal_rank = current_rank  # Update the optimal rank if reconstruction is within the threshold
                 upper_bound = current_rank - 1  # Try to find a smaller rank
                 
                 # compute new svd_target for next iteration
-                X,Y,beta = model.forward()
-                device = model.device
-                svd_target = torch.concatenate([X,Y], dim=0)
-                svd_target -= svd_target.mean(dim=0).unsqueeze(0) # center svd_target -> PCA
+                svd_target = compute_svd_target(model)
             else:
                 print(f'Full reconstruction NOT found for rank {current_rank}\n')
                 lower_bound = current_rank + 1
