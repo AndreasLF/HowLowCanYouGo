@@ -1,7 +1,7 @@
 dataset_path: './data/adj_matrices/ca-GrQc.pt'
 model_types: ['L2', 'LPCA']
 num_epochs: 50_000
-optim_type: 'adam'
+
 max_eval: 25
 model_init: 'random'
 lr: 0.1

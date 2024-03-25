@@ -18,7 +18,6 @@ class Trainer:
                  num_epochs, 
                  save_ckpt, 
                  load_ckpt=None, 
-                 optim_type='lbfgs', 
                  model_init='random',
                  max_eval=25, 
                  device='cpu', 
@@ -34,7 +33,6 @@ class Trainer:
         self.num_epochs = num_epochs
         self.save_ckpt = save_ckpt
         self.load_ckpt = load_ckpt
-        self.optim_type = optim_type
         self.model_init = model_init
         self.max_eval = max_eval
         self.device = device
@@ -91,7 +89,6 @@ class Trainer:
         model = model or self.init_model(rank)
 
         loss_fn = self.loss_fn
-        optim_type = self.optim_type
         num_epochs = self.num_epochs
         dataset_path = self.dataset_path
         full_reconstruction = False
@@ -108,7 +105,6 @@ class Trainer:
                         config={'rank': rank, 
                                 'num_epochs': num_epochs, 
                                 'learning_rate': lr,
-                                'optim_type': optim_type,
                                 'loss_fn': loss_fn_name, 
                                 'model_class': model_class_name,
                                 'dataset_path': dataset_path,
@@ -120,25 +116,8 @@ class Trainer:
         # shift adj matrix to -1's and +1's
         adj_s = self.adj*2 - 1
 
-        # ----------- Closure function (LBFGS) -----------
-        def closure():
-            """Closure function for LBFGS optimizer. This function is called internally by the optimizer."""
-            optimizer.zero_grad()
-            A_hat = model.reconstruct()
-            loss = loss_fn(A_hat, adj_s) 
-            loss.backward()
-            return loss
-
         # ----------- Optimizer ----------- 
-        if optim_type == 'adam':
-            optimizer = optim.Adam(model.parameters(), lr=lr)
-        elif optim_type == 'sgd':
-            optimizer = optim.SGD(model.parameters(), lr=lr)
-        elif optim_type == 'lbfgs':
-            optimizer = optim.LBFGS(model.parameters(), lr=lr, max_eval=self.max_eval)
-        else:
-            raise ValueError(f'Optimizer {optim_type} not supported')
-
+        optimizer = optim.Adam(model.parameters(), lr=lr)
 
         # ----------- Training loop -----------
         with tqdm(range(num_epochs)) as pbar:
@@ -147,19 +126,12 @@ class Trainer:
             epochs_no_improve = 0  # Counter to keep track of epochs with no improvement
 
             for epoch in pbar:
-                
-                if optim_type == 'lbfgs':
-                    # LBFGS optimizer step takes the closure function and internally calls it multiple times
-                    loss = optimizer.step(closure)
-                else: 
-                    # Forward pass
-                    optimizer.zero_grad()
-                    A_hat = model.reconstruct() 
-                    loss = loss_fn(A_hat, adj_s)  # Ensure lpca_loss is compatible with PyTorch and returns a scalar tensor
-                    loss.backward()
-                    optimizer.step()
-                    # if epoch % 1000 == 0:
-                    #     pdb.set_trace()
+                # Forward pass
+                optimizer.zero_grad()
+                A_hat = model.reconstruct() 
+                loss = loss_fn(A_hat, adj_s)  # Ensure lpca_loss is compatible with PyTorch and returns a scalar tensor
+                loss.backward()
+                optimizer.step()
 
                 # Compute and print the Frobenius norm for diagnostics
                 with torch.no_grad():  # Ensure no gradients are computed in this block
@@ -328,10 +300,7 @@ class Trainer:
         print(f'Finding optimal rank between {min_rank} and {max_rank}')
         print('-'*50)
 
-        # 1. (optional) pretrain on MDS or SVD objective
-        # TODO
-        
-        # 2. Train initial high guess
+        # 1. Train initial high guess
         save_path = None # ! just ignore initial model
         model = self.init_model(rank=max_rank)
         if self.model_init != 'load':
@@ -351,17 +320,12 @@ class Trainer:
             else:
                 save_path = None
 
-            # 3. Perform SVD estimate from higher into lower rank approx.
-                # i.e.
-                # [U,S,V]=Svd(Concat(X,Y))
-                # S*V is truncated
-                # Vx and Vy are used as new estimates of X and Y with reduced dimension.
-            # pdb.set_trace()
+            # 2. Perform SVD estimate from higher into lower rank approx.
             _,_,V = torch.svd_lowrank(svd_target, q=current_rank)
             X,Y = torch.chunk(svd_target, 2, dim=0)
             model = model.__class__(X@V, Y@V, device=device)
 
-            # 4. Train the model
+            # 3. Train new model
             model = self.train(current_rank, model=model, lr=lr, early_stop_patience=early_stop_patience, save_path=save_path)
 
             # Calculate the Frobenius error

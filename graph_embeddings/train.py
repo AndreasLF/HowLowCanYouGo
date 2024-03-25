@@ -49,8 +49,8 @@ if __name__ == '__main__':
     # Initialize the trainer
     trainer = Trainer(adj=adj, model_class=model, loss_fn=loss_fn, model_init=model_init,
                       threshold=10e-5, num_epochs=args.num_epochs, save_ckpt=args.save_ckpt,
-                      load_ckpt=args.load_ckpt, optim_type=args.optim_type,
-                      device=args.device, max_eval=args.max_eval, loggers=[JSONLogger])#, wandb])
+                      load_ckpt=args.load_ckpt, device=args.device, 
+                      max_eval=args.max_eval, loggers=[JSONLogger])#, wandb])
     
     # Train one model model
     model = trainer.init_model(args.rank)

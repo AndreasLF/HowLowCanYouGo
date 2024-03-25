@@ -33,7 +33,7 @@ def run_experiment(config: Config, device: str = 'cpu', results_folder: str = 'r
         loggers = [JSONLogger] if dev else [JSONLogger, wandb]
         # Initialize the trainer
         trainer = Trainer(adj=adj, model_class=model_class, loss_fn=loss_fn, model_init=model_init,
-                        threshold=1e-7, num_epochs=config.get("num_epochs"), optim_type=config.get('optim_type'), 
+                        threshold=1e-7, num_epochs=config.get("num_epochs"),
                         device=device, max_eval=config.get('max_eval'), loggers=loggers, dataset_path=dataset_path, 
                         save_ckpt=results_folder, load_ckpt=load_ckpt)
         
