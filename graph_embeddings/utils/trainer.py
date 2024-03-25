@@ -339,6 +339,7 @@ class Trainer:
         X,Y,beta = model.forward()
         device = model.device
         svd_target = torch.concatenate([X,Y], dim=0)
+        svd_target -= svd_target.mean(dim=0).unsqueeze(0) # center svd_target -> PCA
         
         while lower_bound <= upper_bound:
             current_rank = (lower_bound + upper_bound) // 2
@@ -353,10 +354,11 @@ class Trainer:
             # 3. Perform SVD estimate from higher into lower rank approx.
                 # i.e.
                 # [U,S,V]=Svd(Concat(X,Y))
-                # S*V trunkeres
-                # Vx og Vy tages ud som nye estimater af X og Y med reduceret dimension.
-            
+                # S*V is truncated
+                # Vx and Vy are used as new estimates of X and Y with reduced dimension.
+            # pdb.set_trace()
             _,_,V = torch.svd_lowrank(svd_target, q=current_rank)
+            X,Y = torch.chunk(svd_target, 2, dim=0)
             model = model.__class__(X@V, Y@V, device=device)
 
             # 4. Train the model
@@ -376,6 +378,7 @@ class Trainer:
                 X,Y,beta = model.forward()
                 device = model.device
                 svd_target = torch.concatenate([X,Y], dim=0)
+                svd_target -= svd_target.mean(dim=0).unsqueeze(0) # center svd_target -> PCA
             else:
                 print(f'Full reconstruction NOT found for rank {current_rank}\n')
                 lower_bound = current_rank + 1
