@@ -7,13 +7,9 @@ class LPCAModel(nn.Module):
     def __init__(self, 
                  X: torch.Tensor, 
                  Y: torch.Tensor, 
-                 device: str="cpu",
                  inference_only: bool=False):
         super(LPCAModel, self).__init__()
-        self.device = device
         if X.shape == Y.shape: Y = Y.t() # 2D transpose
-        X = X.to(device)
-        Y = Y.to(device)
         self.X = nn.Parameter(X) if not inference_only else X
         self.Y = nn.Parameter(Y) if not inference_only else Y
         self.S = None # ! only set if pretraining on SVD objective
@@ -32,11 +28,10 @@ class LPCAModel(nn.Module):
     @classmethod
     def init_pre_svd(cls, 
                      U: torch.Tensor, 
-                     V: torch.Tensor, 
-                     device: str="cpu"):
+                     V: torch.Tensor):
         assert U.shape == V.shape, "U & V must be dimensions (n,r) & (n,r), respectively, r: emb. rank, n: # of nodes"
-        model = cls(U, V, device=device, inference_only=True) # we only learn S in A = USV^T
-        S = torch.randn(U.shape[1]).to(device)
+        model = cls(U, V, inference_only=True) # we only learn S in A = USV^T
+        S = torch.randn(U.shape[1])
         model.S = nn.Parameter(S)
         return model
     

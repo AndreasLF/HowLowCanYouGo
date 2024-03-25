@@ -2,22 +2,17 @@ import pdb
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from graph_embeddings.utils.mds_utils import pairwise_jaccard_similarity, norm_and_rescale
 
 # Euclidean embedding model
 class L2Model(nn.Module):
     def __init__(self, 
                  X: torch.Tensor, 
                  Y: torch.Tensor, 
-                 device: str="cpu",
                  inference_only: bool=False):
         super(L2Model, self).__init__()
-        self.device = device
-        X = X.to(device)
-        Y = Y.to(device)
         self.X = nn.Parameter(X) if not inference_only else X
         self.Y = nn.Parameter(Y) if not inference_only else Y
-        self.beta = nn.Parameter(torch.randn(1).to(device)) # (scalar) free parameter bias term
+        self.beta = nn.Parameter(torch.randn(1)) # (scalar) free parameter bias term
         self.S = None # ! only set if pretraining on SVD objective
 
     @classmethod
@@ -43,50 +38,13 @@ class L2Model(nn.Module):
     def init_pre_svd(cls, 
                      U: torch.Tensor, 
                      V: torch.Tensor, 
-                     device: str="cpu",
                      **kwargs):
         assert U.shape == V.shape, "U & V must be dimensions (n,r) & (n,r), respectively, r: emb. rank, n: # of nodes"
-        model = cls(U, V, device=device, inference_only=True, **kwargs) # we only learn S in A = USV^T
-        S = torch.randn(U.shape[1]).to(device)
+        model = cls(U, V, inference_only=True, **kwargs) # we only learn S in A = USV^T
+        S = torch.randn(U.shape[1])
         model.S = nn.Parameter(S)
         return model
     
-    @classmethod
-    def init_pre_mds(cls,
-                     A: torch.Tensor,
-                     rank: int,
-                     device: str="cpu",
-                     **kwargs):
-        n, _ = A.size()
-
-        C = (torch.eye(n) - torch.ones((n, n)) / n).to(device)
-
-        def dis_measure(adj):
-            return 1. - adj ## simple measure
-            # return 1 - pairwise_jaccard_similarity(adj)
-        
-        disc = dis_measure(A)
-        disr = dis_measure(A.t())
-
-        def mds_helper(dis):
-            B = -.5 * C @ torch.square(dis) @ C
-
-            eigenvalues, eigenvectors = torch.linalg.eigh(B) # eigh because B symmetric
-            idx = eigenvalues.argsort(descending=True)
-            eigenvalues = eigenvalues[idx]
-            eigenvectors = eigenvectors[:, idx]
-
-            L = torch.diag(torch.sqrt(eigenvalues[:rank]))
-            E = eigenvectors[:, :rank]
-            return E,L
-
-        Er,Lr = mds_helper(disr)
-        Ec,Lc = mds_helper(disc)
-        X = norm_and_rescale( Er@Lr )
-        Y = norm_and_rescale( Ec@Lc )
-        pdb.set_trace()
-        return cls(X=X, Y=Y, device=device, inference_only=False, **kwargs)
-
     """
     Method 2 of 2. [together with init_pre_svd]
     Initialize a model for further training, using U, V and learned S to 
