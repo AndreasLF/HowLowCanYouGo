@@ -49,29 +49,29 @@ TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
 		--device $(DEVICE)
 
 train-ll2:
-	$(TRAIN_RANDOM)
+	$(TRAIN_RANDOM) \
 		--model-type L2 --loss-type logistic \
 		--save-ckpt results/ll2.pt
 train-lpca:
-	$(TRAIN_RANDOM)
+	$(TRAIN_RANDOM) \
 		--model-type PCA --loss-type logistic \
 		--save-ckpt results/lpca.pt
 
 train-hl2:
-	$(TRAIN_RANDOM)
+	$(TRAIN_RANDOM) \
 		--model-type L2 --loss-type hinge \
 		--save-ckpt results/hl2.pt
 train-hpca:
-	$(TRAIN_RANDOM)
+	$(TRAIN_RANDOM) \
 		--model-type PCA --loss-type hinge \
 		--save-ckpt results/hpca.pt
 
 train-pl2:
-	$(TRAIN_RANDOM)
+	$(TRAIN_RANDOM) \
 		--model-type L2 --loss-type poisson \
 		--save-ckpt results/pl2.pt
 train-ppca:
-	$(TRAIN_RANDOM)
+	$(TRAIN_RANDOM) \
 		--model-type PCA --loss-type poisson \
 		--save-ckpt results/ppca.pt
 
