@@ -1,7 +1,7 @@
 import pdb
 import torch
 from graph_embeddings.models.L2Model import L2Model
-from graph_embeddings.models.LPCAModel import LPCAModel
+from graph_embeddings.models.PCAModel import PCAModel
 from graph_embeddings.utils.loss import LogisticLoss, HingeLoss
 from graph_embeddings.utils.trainer import Trainer
 import argparse
@@ -23,34 +23,37 @@ def run_experiment(config: Config,
     adj = load_adj(dataset_path).to(config.get('device'))
     
     model_types = config.get('model_types')
+    loss_types = config.get('loss_types')
 
     for model_type in model_types:
-        print(f"# Training {model_type} model...")
+        for loss_type in loss_types:
+            print(f"# Training {model_type} model with {loss_type}...")
 
-        # Determine the model and loss function based on config
-        model_class = {'LPCA': LPCAModel, 'L2': L2Model}[model_type]
-        loss_type = 'logistic'
-        loss_type = 'hinge'
-        loss_fn = {'logistic': LogisticLoss, 'hinge': HingeLoss}[loss_type]()
-        
-        load_ckpt = config.get('load_ckpt')
-        model_init = config.get('model_init') or 'random'
-        
-        loggers = {0: [], 1: [JSONLogger], 2: [JSONLogger, wandb]}[loglevel]
-        # Initialize the trainer
-        trainer = Trainer(adj=adj, model_class=model_class, loss_fn=loss_fn, model_init=model_init,
-                        threshold=1e-10, num_epochs=config.get("num_epochs"),
-                        device=device, max_eval=config.get('max_eval'), loggers=loggers, dataset_path=dataset_path, 
-                        save_ckpt=results_folder, load_ckpt=load_ckpt)
-        
-        # If rank_range is specified, search for the optimal rank
-        rank_range = config.get('rank_range')
-        if rank_range:
-            trainer.find_optimal_rank(rank_range['min'], 
-                                       rank_range['max'], 
-                                       lr=config.get('lr'), 
-                                       early_stop_patience=config.get('early_stop_patience'), 
-                                       experiment_name=experiment_name)
+            # Determine the model and loss function based on config
+            model_class = {'PCA': PCAModel, 'L2': L2Model}[model_type]
+            loss_fn = {'logistic': LogisticLoss, 'hinge': HingeLoss}[loss_type]()
+            
+            load_ckpt = config.get('load_ckpt')
+            model_init = config.get('model_init') or 'random'
+            
+            loggers = {0: [], 1: [JSONLogger], 2: [JSONLogger, wandb]}[loglevel]
+            
+            # Initialize the trainer
+            trainer = Trainer(adj=adj, model_class=model_class, 
+                              loss_fn=loss_fn, model_init=model_init,
+                              threshold=1e-10, num_epochs=config.get("num_epochs"),
+                              device=device, max_eval=config.get('max_eval'), 
+                              loggers=loggers, dataset_path=dataset_path, 
+                              save_ckpt=results_folder, load_ckpt=load_ckpt)
+            
+            # If rank_range is specified, search for the optimal rank
+            rank_range = config.get('rank_range')
+            if rank_range:
+                trainer.find_optimal_rank(rank_range['min'], 
+                                        rank_range['max'], 
+                                        lr=config.get('lr'), 
+                                        early_stop_patience=config.get('early_stop_patience'), 
+                                        experiment_name=experiment_name)
 
 def main():
     parser = argparse.ArgumentParser()

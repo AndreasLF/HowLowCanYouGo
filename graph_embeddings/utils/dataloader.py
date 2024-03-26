@@ -28,6 +28,10 @@ class Batch:
     def __init__(self, sub_graph: torch_geometric.data.Data):
         self.sub_graph = sub_graph
 
+    def to(self, device):
+        self.sub_graph = self.sub_graph.to(device)
+        return self
+
     @cached_property
     def indices(self):
         return self.sub_graph.edge_index.unique()

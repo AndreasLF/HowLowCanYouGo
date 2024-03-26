@@ -1,5 +1,6 @@
 dataset_path: './data/adj_matrices/ca-GrQc.pt'
-model_types: ['L2', 'LPCA']
+model_types: ['L2', 'PCA']
+loss_types: ['logistic', 'hinge']
 num_epochs: 50_000
 
 max_eval: 25

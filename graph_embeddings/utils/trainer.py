@@ -7,7 +7,7 @@ from tqdm import tqdm
 import os
 
 from graph_embeddings.models.L2Model import L2Model
-from graph_embeddings.models.LPCAModel import LPCAModel
+from graph_embeddings.models.PCAModel import PCAModel
 from graph_embeddings.utils.load_data import load_adj
 from graph_embeddings.utils.logger import JSONLogger
 
@@ -69,7 +69,7 @@ class Trainer:
 
     def train(self, 
               rank: int, 
-              model: L2Model|LPCAModel|None = None,
+              model: L2Model|PCAModel|None = None,
               lr: float = 0.01, 
               early_stop_patience: float = None, 
               save_path: str = None):
@@ -114,7 +114,7 @@ class Trainer:
         # # shift adj matrix to -1's and +1's
         # adj_s = self.adj*2 - 1
             
-        adj = self.dataloader.full_adj
+        adj = self.dataloader.full_adj.to(self.device)
 
         # ----------- Optimizer ----------- 
         optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -133,6 +133,7 @@ class Trainer:
             for epoch in pbar:
 
                 for b_idx, batch in enumerate(self.dataloader):
+                    batch.to(self.device)
                     # Forward pass
                     optimizer.zero_grad()
                     A_hat = model.reconstruct(batch.indices) 

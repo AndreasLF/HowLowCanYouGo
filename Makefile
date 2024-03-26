@@ -38,29 +38,44 @@ datasets:
 run_experiments:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/run_experiments.py $(ARGS)
 
-pretrain_svd_l2:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type L2 --rank 32 --train-mode pretrain --optim-type adam --lr 1e-1 --num-epochs 3_000 --save-ckpt results/svd-init-l2.pt --device cuda
-pretrain_svd_lpca:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type LPCA --rank 32 --train-mode pretrain --optim-type adam --lr 1e-2 --num-epochs 3_000 --save-ckpt results/svd-init-lpca.pt --device cuda
+RANK = 8
+LR = 1.0
+EPOCHS = 10_000
 
-init_from_svd_l2:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type L2 --rank 32 --train-mode reconstruct-from-svd --optim-type adam --lr 1e-1 --num-epochs 3_000 --load-ckpt results/svd-init-l2.pt --save-ckpt results/pretrained-test-l2.pt --device cuda
-init_from_svd_lpca:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type LPCA --rank 32 --train-mode reconstruct-from-svd --optim-type adam --lr 1e-2 --num-epochs 3_000 --load-ckpt results/svd-init-lpca.pt --save-ckpt results/pretrained-test-lpca.pt --device cuda
+train-ll2:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
+		--model-type L2 --loss-type logistic \
+		--rank $(RANK) \
+		--lr $(LR) --num-epochs $(EPOCHS) \
+		--save-ckpt results/ll2.pt \
+		--device cuda \
+		--model-init random
 
+train-lpca:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
+		--model-type PCA --loss-type logistic \
+		--rank $(RANK) \
+		--lr $(LR) --num-epochs $(EPOCHS) \
+		--save-ckpt results/lpca.pt \
+		--device cuda \
+		--model-init random
 
-MDS_RANK = 8
-MDS_LR = 1e-1
+train-hl2:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
+		--model-type L2 --loss-type hinge \
+		--rank $(RANK) \
+		--lr $(LR) --num-epochs $(EPOCHS) \
+		--save-ckpt results/hl2.pt \
+		--device cuda \
+		--model-init random
 
-init_from_mds_l2:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type L2 --rank $(MDS_RANK) \
-		--optim-type adam --lr $(MDS_LR) --num-epochs 3_000 \
-		--save-ckpt results/mds-test-l2.pt --device cuda \
-		--model-init mds
-init_from_rand_l2:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py --model-type L2 --rank $(MDS_RANK) \
-		--optim-type adam --lr $(MDS_LR) --num-epochs 3_000 \
-		--save-ckpt results/mds-test-l2.pt --device cuda \
+train-hpca:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
+		--model-type PCA --loss-type hinge \
+		--rank $(RANK) \
+		--lr $(LR) --num-epochs $(EPOCHS) \
+		--save-ckpt results/hpca.pt \
+		--device cuda \
 		--model-init random
 
 get_stats:
