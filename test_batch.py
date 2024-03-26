@@ -22,14 +22,14 @@ import pdb
 #             index = torch.tensor(index)
 
 #         if isinstance(self.data, Data):
-#             return self.data.subgraph(index), index
+#             return self.data.subgraph(index)
 
 #         elif isinstance(self.data, HeteroData):
 #             node_dict = {
 #                 key: index[(index >= start) & (index < end)] - start
 #                 for key, (start, end) in self.node_dict.items()
 #             }
-#             return self.data.subgraph(node_dict), index
+#             return self.data.subgraph(node_dict)
 
 # RandomNodeLoader.collate_fn = collate_fn_custom
 
@@ -41,10 +41,14 @@ cfg = Config("configs/config.yaml")
 raw_path = cfg.get("data", "raw_path")
 
 # %%
-dataset = get_data_from_torch_geometric("SNAPDataset", "ca-hepph", raw_path)
+dataset = get_data_from_torch_geometric("Planetoid", "Cora", raw_path)
+
 
 data = dataset[0]
-data.edge_attr = data.edge_index[0]
+
+if "edge_index" in data:
+    edge_index = data.edge_index
+    print(edge_index.shape)
 
 # %%
 
@@ -59,6 +63,7 @@ class Batch:
 
     @cached_property
     def adj(self):
+        # relabel nodes in subgraph
         A = to_dense_adj(self.sub_graph.edge_index).squeeze(0)
         return A
 
@@ -86,26 +91,44 @@ class CustomGraphDataLoader:
     def num_total_nodes(self):
         return self.data.num_nodes
 
+    
 # %%
-dataloader = CustomGraphDataLoader(data,batch_size=256)
+from graph_embeddings.models.L2Model import L2Model
+
+
+dataloader = CustomGraphDataLoader(data,batch_size=data.num_nodes)
+model = L2Model.init_random(dataloader.num_total_nodes, dataloader.num_total_nodes, 50)
 
 for b_idx, batch in enumerate(dataloader):
     print("Batch", b_idx)
-    print(batch.adj.shape)
+    idx = batch.indices
+    print(idx.shape)
     print(batch.adj_s.shape)
-    print(batch.indices.shape)
-    if b_idx == 5:
-        break
-    
+    print(batch.adj)
+
+    adj = batch.adj
+    # remove any rows or columns that are all zeros
+    adj = adj[~torch.all(adj == 0, dim=1)]
+    adj = adj[:, ~torch.all(adj == 0, dim=0)]
+
+    print(adj.shape)
+    print(model.reconstruct(idx).shape)
+    break
+
+
 # %%
 
 # Testing subgraph
 from torch_geometric.utils import subgraph
 
-edge_index = torch.tensor([[0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 6],
-                           [1, 0, 2, 1, 3, 2, 4, 3, 5, 4, 2]])
+edge_index = torch.tensor([[0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 6, 100, 2],
+                           [1, 0, 2, 1, 3, 2, 4, 3, 5, 4, 2, 2, 2]])
 
-subset = torch.tensor([3, 4, 5, 6, 2])
-subg, attr = subgraph(subset, edge_index)
+subset = torch.tensor([3, 4, 5, 6, 2, 100])
+subg, attr = subgraph(subset, edge_index, relabel_nodes=True)
+print(subg)
+print(subg.shape)
 
-print(subg[0].unique().shape)
+
+
+# %%
