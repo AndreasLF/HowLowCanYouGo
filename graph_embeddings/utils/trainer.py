@@ -139,14 +139,14 @@ class Trainer:
             epochs_no_improve = 0  # Counter to keep track of epochs with no improvement
 
             for epoch in pbar:
-"""
+                """
                 # Forward pass
                 optimizer.zero_grad()
                 A_hat = model.reconstruct()
                 loss = loss_fn(A_hat, A)
                 loss.backward()
                 optimizer.step()
-"""
+                """
 
                 for b_idx, batch in enumerate(self.dataloader):
                     batch.to(self.device)
