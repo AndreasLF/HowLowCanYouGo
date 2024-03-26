@@ -3,7 +3,7 @@ dataset_path: './data/adj_matrices/Cora.pt'
 model_types: ['LPCA']
 num_epochs: 50_000
 
-max_eval: 25
+
 model_init: 'random'
 lr: 1.0
 early_stop_patience: 100

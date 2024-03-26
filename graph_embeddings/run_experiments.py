@@ -40,7 +40,7 @@ def run_experiment(config: Config,
         # Initialize the trainer
         trainer = Trainer(adj=adj, model_class=model_class, loss_fn=loss_fn, model_init=model_init,
                         threshold=1e-10, num_epochs=config.get("num_epochs"),
-                        device=device, max_eval=config.get('max_eval'), loggers=loggers, dataset_path=dataset_path, 
+                        device=device, loggers=loggers, dataset_path=dataset_path, 
                         save_ckpt=results_folder, load_ckpt=load_ckpt)
         
         # If rank_range is specified, search for the optimal rank

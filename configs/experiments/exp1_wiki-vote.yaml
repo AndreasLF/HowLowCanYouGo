@@ -2,7 +2,7 @@ dataset_path: './data/adj_matrices/Wiki-Vote.pt'
 model_types: ['L2', 'LPCA']
 num_epochs: 50_000
 
-max_eval: 25
+
 model_init: 'random'
 lr: 0.1
 early_stop_patience: 500

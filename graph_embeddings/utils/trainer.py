@@ -21,7 +21,6 @@ class Trainer:
                  save_ckpt, 
                  load_ckpt=None, 
                  model_init='random',
-                 max_eval=25, 
                  device='cpu', 
                  loggers=[JSONLogger], 
                  project_name='GraphEmbeddings',
@@ -36,7 +35,6 @@ class Trainer:
         self.save_ckpt = save_ckpt
         self.load_ckpt = load_ckpt
         self.model_init = model_init
-        self.max_eval = max_eval
         self.device = device
         self.loggers = loggers
         self.project_name = project_name

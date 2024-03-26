@@ -72,7 +72,6 @@ The experiment configuration file is a yaml file that defines the experiment. An
 dataset_path: './data/adj_matrices/Cora.pt' # Path to the dataset
 model_types: ['L2', 'LPCA'] # Which models to run
 num_epochs: 50_000 # Number of epochs to run
-max_eval: 25 # Number of evaluations, used for LBFGS
 model_init: 'random' # Model initialization, random or svd
 lr: 0.1 # Learning rate
 early_stop_patience: 500 # Early stopping patience, if no improvement in loss after this number of consecutive epochs, stop
