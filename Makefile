@@ -38,45 +38,42 @@ datasets:
 run_experiments:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/run_experiments.py $(ARGS)
 
+DEVICE = cuda
 RANK = 8
 LR = 1.0
 EPOCHS = 10_000
+TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
+		--rank $(RANK) \
+		--lr $(LR) --num-epochs $(EPOCHS) \
+		--model-init random \
+		--device $(DEVICE)
 
 train-ll2:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
+	$(TRAIN_RANDOM)
 		--model-type L2 --loss-type logistic \
-		--rank $(RANK) \
-		--lr $(LR) --num-epochs $(EPOCHS) \
-		--save-ckpt results/ll2.pt \
-		--device cuda \
-		--model-init random
-
+		--save-ckpt results/ll2.pt
 train-lpca:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
+	$(TRAIN_RANDOM)
 		--model-type PCA --loss-type logistic \
-		--rank $(RANK) \
-		--lr $(LR) --num-epochs $(EPOCHS) \
-		--save-ckpt results/lpca.pt \
-		--device cuda \
-		--model-init random
+		--save-ckpt results/lpca.pt
 
 train-hl2:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
+	$(TRAIN_RANDOM)
 		--model-type L2 --loss-type hinge \
-		--rank $(RANK) \
-		--lr $(LR) --num-epochs $(EPOCHS) \
-		--save-ckpt results/hl2.pt \
-		--device cuda \
-		--model-init random
-
+		--save-ckpt results/hl2.pt
 train-hpca:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
+	$(TRAIN_RANDOM)
 		--model-type PCA --loss-type hinge \
-		--rank $(RANK) \
-		--lr $(LR) --num-epochs $(EPOCHS) \
-		--save-ckpt results/hpca.pt \
-		--device cuda \
-		--model-init random
+		--save-ckpt results/hpca.pt
+
+train-pl2:
+	$(TRAIN_RANDOM)
+		--model-type L2 --loss-type poisson \
+		--save-ckpt results/pl2.pt
+train-ppca:
+	$(TRAIN_RANDOM)
+		--model-type PCA --loss-type poisson \
+		--save-ckpt results/ppca.pt
 
 get_stats:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/make_stats.py --print-latex
