@@ -21,7 +21,6 @@ class Trainer:
                  save_ckpt, 
                  load_ckpt=None, 
                  model_init='random',
-                 max_eval=25, 
                  device='cpu', 
                  loggers=[JSONLogger], 
                  project_name='GraphEmbeddings',
@@ -36,7 +35,6 @@ class Trainer:
         self.save_ckpt = save_ckpt
         self.load_ckpt = load_ckpt
         self.model_init = model_init
-        self.max_eval = max_eval
         self.device = device
         self.loggers = loggers
         self.project_name = project_name
@@ -110,9 +108,19 @@ class Trainer:
                                 })
 
 
+        """
+        # ----------- Shift adjacency matrix -----------
+        # shift adj matrix to -1's and +1's
+        if loss_fn_name == 'PoissonLoss':
+            print("using adjacency")
+            A = self.adj # adjacency matrix used in loss function
+        else:
+            print("using shifted adjacency")
+            A = self.adj*2 - 1 # shifted adjacency matrix used in loss function
         # # ----------- Shift adjacency matrix -----------
         # # shift adj matrix to -1's and +1's
         # adj_s = self.adj*2 - 1
+        """
             
         adj = self.dataloader.full_adj.to(self.device)
 
@@ -131,6 +139,14 @@ class Trainer:
             epochs_no_improve = 0  # Counter to keep track of epochs with no improvement
 
             for epoch in pbar:
+"""
+                # Forward pass
+                optimizer.zero_grad()
+                A_hat = model.reconstruct()
+                loss = loss_fn(A_hat, A)
+                loss.backward()
+                optimizer.step()
+"""
 
                 for b_idx, batch in enumerate(self.dataloader):
                     batch.to(self.device)

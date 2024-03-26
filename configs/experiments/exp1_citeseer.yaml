@@ -3,7 +3,7 @@ model_types: ['L2', 'PCA']
 loss_types: ['logistic', 'hinge']
 num_epochs: 50_000
 
-max_eval: 25
+
 model_init: 'random'
 lr: 0.1
 early_stop_patience: 500 # Number of consecutive epochs without improvement after which early stopping will be applied
