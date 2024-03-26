@@ -5,6 +5,9 @@ from torch_geometric.loader import RandomNodeLoader
 from torch_geometric.utils import to_dense_adj
 from functools import cached_property
 from torch_geometric.utils import subgraph
+import copy
+
+from torch_geometric.utils import select, subgraph
 
 from torch_geometric.data import Data, HeteroData
 
@@ -13,20 +16,58 @@ from torch_geometric.data import Data, HeteroData
 #             index = torch.tensor(index)
 
 #         if isinstance(self.data, Data):
-#             return self.data.subgraph(index, relabel_nodes=True)
+#             return self.data.subgraph(index), index
 
 #         elif isinstance(self.data, HeteroData):
 #             node_dict = {
 #                 key: index[(index >= start) & (index < end)] - start
 #                 for key, (start, end) in self.node_dict.items()
 #             }
-#             return self.data.subgraph(node_dict, relabel_nodes=True)
+#             return self.data.subgraph(node_dict), index
 
 # RandomNodeLoader.collate_fn = collate_fn_custom
+
+
+# Monkey patch the subgraph method on the Data class to not relabel nodes
+def subgraph_custom(self, subset: Tensor) -> 'Data':
+        r"""Returns the induced subgraph given by the node indices
+        :obj:`subset`.
+
+        Args:
+            subset (LongTensor or BoolTensor): The nodes to keep.
+        """
+        out = subgraph(subset, self.edge_index, relabel_nodes=False,
+                       num_nodes=self.num_nodes, return_edge_mask=True)
+        
+        edge_index, _, edge_mask = out
+
+        data = copy.copy(self)
+
+        for key, value in self:
+            if key == 'edge_index':
+                data.edge_index = edge_index
+            elif key == 'num_nodes':
+                if subset.dtype == torch.bool:
+                    data.num_nodes = int(subset.sum())
+                else:
+                    data.num_nodes = subset.size(0)
+            elif self.is_node_attr(key):
+                cat_dim = self.__cat_dim__(key, value)
+                data[key] = select(value, subset, dim=cat_dim)
+            elif self.is_edge_attr(key):
+                cat_dim = self.__cat_dim__(key, value)
+                data[key] = select(value, edge_mask, dim=cat_dim)
+
+        return data
+
+
+Data.subgraph = subgraph_custom
+
 
 class Batch:
     def __init__(self, sub_graph: torch_geometric.data.Data):
         self.sub_graph = sub_graph
+        # self.indices = indices
 
     def to(self, device):
         self.sub_graph = self.sub_graph.to(device)
@@ -41,6 +82,8 @@ class Batch:
         A = to_dense_adj(self.sub_graph.edge_index).squeeze(0)
         A = A[~torch.all(A == 0, dim=1)]
         A = A[:, ~torch.all(A == 0, dim=0)]
+        # add 1 to diagonal
+        A = A.fill_diagonal_(1)
         return A
 
     @cached_property
@@ -70,6 +113,8 @@ class CustomGraphDataLoader:
     @cached_property
     def full_adj(self):
         A = to_dense_adj(self.data.edge_index).squeeze(0)
+        # add 1 to diagonal
+        A = A.fill_diagonal_(1)
         return A
 
 
@@ -79,28 +124,43 @@ if __name__ == '__main__':
     from graph_embeddings.utils.config import Config
 
     cfg = Config("configs/config.yaml")
-
+   
     raw_path = cfg.get("data", "raw_path")
+    adj_matrices_path = cfg.get("data", "adj_matrices_path")
 
     # %%
     dataset = get_data_from_torch_geometric("Planetoid", "Cora", raw_path)
+
     data = dataset[0]
+    adj_true = torch.load(f"{adj_matrices_path}/Cora.pt")
 
     dataloader = CustomGraphDataLoader(data,batch_size=data.num_nodes)
     model = L2Model.init_random(dataloader.num_total_nodes, dataloader.num_total_nodes, 50)
 
+
+    fulladj = dataloader.full_adj
+    compare = torch.all(fulladj == adj_true)
+    print("Adjacency matrices are equal:", compare.item())
+
+    data = dataset[0]
+
+    dataloader = CustomGraphDataLoader(data,batch_size=520)
+    model = L2Model.init_random(dataloader.num_total_nodes, dataloader.num_total_nodes, 50)
+
     for b_idx, batch in enumerate(dataloader):
-        print("Batch", b_idx)
+        print("Batch:", b_idx)
         idx = batch.indices
-        print(idx.shape)
-        print(batch.adj_s.shape)
-        print(batch.adj)
 
-        adj = batch.adj
-        # remove any rows or columns that are all zeros
-        adj = adj[~torch.all(adj == 0, dim=1)]
-        adj = adj[:, ~torch.all(adj == 0, dim=0)]
+        # only take out a submatrix of the adj_true matrix
+        adj_true_sub = adj_true[idx][:,idx]
+        batch_adj = batch.adj
 
-        print(adj.shape)
-        print(model.reconstruct(idx).shape)
+        # compare the adjacency matrices
+        compare = torch.all(adj_true_sub == batch_adj)
+        print("  Adjacency matrices in batch are equal:", compare.item())
+
+        print("  Batch adj shape:", batch.adj.shape)
+        print("  Batch adj_s shape:", batch.adj_s.shape)
+        print("  Batch indices shape:", batch.indices.shape)
+        print("  Reconstruct shape:", model.reconstruct(idx).shape)
         break
