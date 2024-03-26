@@ -49,7 +49,7 @@ if __name__ == '__main__':
     # Get first graph in dataset
     data = dataset[0]
 
-    dataloader = CustomGraphDataLoader(data, batch_size=data.num_nodes)
+    dataloader = CustomGraphDataLoader(data, batch_size=int(.25*data.num_nodes))
 
     model_init = args.model_init
 

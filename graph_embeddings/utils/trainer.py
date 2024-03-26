@@ -122,7 +122,7 @@ class Trainer:
         # adj_s = self.adj*2 - 1
         """
             
-        adj = self.dataloader.full_adj.to(self.device)
+        self.adj = self.dataloader.full_adj.to(self.device) # ! used for small graphs for FROB
 
         # ----------- Optimizer ----------- 
         optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -162,7 +162,7 @@ class Trainer:
                     # Compute Frobenius error for diagnostics
                     with torch.no_grad():  # Ensure no gradients are computed in this block
                         A_hat = model.reconstruct()
-                        frob_error_norm = self.calc_frob_error_norm(A_hat, adj)
+                        frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
 
                     # Log metrics to all loggers
                     metrics = {'epoch': epoch, 'loss': loss.item(), 'frob_error_norm': frob_error_norm.item()}
