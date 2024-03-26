@@ -110,7 +110,12 @@ class Trainer:
 
         # ----------- Shift adjacency matrix -----------
         # shift adj matrix to -1's and +1's
-        adj_s = self.adj*2 - 1
+        if loss_fn_name == 'PoissonLoss':
+            print("using adjacency")
+            A = self.adj # adjacency matrix used in loss function
+        else:
+            print("using shifted adjacency")
+            A = self.adj*2 - 1 # shifted adjacency matrix used in loss function
 
         # ----------- Optimizer ----------- 
         optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -129,8 +134,8 @@ class Trainer:
             for epoch in pbar:
                 # Forward pass
                 optimizer.zero_grad()
-                A_hat = model.reconstruct() 
-                loss = loss_fn(A_hat, adj_s)
+                A_hat = model.reconstruct()
+                loss = loss_fn(A_hat, A)
                 loss.backward()
                 optimizer.step()
 
