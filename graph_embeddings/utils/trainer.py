@@ -2,8 +2,10 @@ import pdb
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim.lr_scheduler import StepLR
 from tqdm import tqdm
 import os
+
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.models.LPCAModel import LPCAModel
 from graph_embeddings.utils.load_data import load_adj
@@ -115,6 +117,11 @@ class Trainer:
         # ----------- Optimizer ----------- 
         optimizer = optim.Adam(model.parameters(), lr=lr)
 
+        # ----------- Scheduler -----------
+        step_size = 1
+        gamma = .5  # Decay factor
+        scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
+
         # ----------- Training loop -----------
         with tqdm(range(num_epochs)) as pbar:
 
@@ -129,17 +136,20 @@ class Trainer:
                 loss.backward()
                 optimizer.step()
 
-                # Compute and print the Frobenius norm for diagnostics
-                with torch.no_grad():  # Ensure no gradients are computed in this block
-                    A_hat = model.reconstruct()
-                    frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
-                    pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={loss:.1f} frob_err={frob_error_norm:.4f}")
+                if epoch % 100 == 0: # ! only check every {x}'th epoch
+                    last_frob_epoch = epoch
+                    # Compute Frobenius error for diagnostics
+                    with torch.no_grad():  # Ensure no gradients are computed in this block
+                        A_hat = model.reconstruct()
+                        frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
 
-                # Log metrics to all loggers
-                metrics = {'epoch': epoch, 'loss': loss.item(), 'frob_error_norm': frob_error_norm.item()}
-                for logger in self.loggers:
-                    logger.log(metrics)
+                    # Log metrics to all loggers
+                    metrics = {'epoch': epoch, 'loss': loss.item(), 'frob_error_norm': frob_error_norm.item()}
+                    for logger in self.loggers:
+                        logger.log(metrics)
 
+                # update progress bar
+                pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={loss:.1f} frob_err@{last_frob_epoch}={frob_error_norm or .0:.4f}")
                 # Break if Froebenius error is less than threshold
                 if frob_error_norm <= self.threshold:
                     pbar.close()
@@ -150,7 +160,6 @@ class Trainer:
                     break
 
                 if early_stop_patience is not None:
-
                     # Early stopping condition based on loss improvement
                     if loss < best_loss:
                         best_loss = loss  # Update best loss
@@ -163,8 +172,10 @@ class Trainer:
                         for logger in self.loggers:
                             logger.config.update({'early_stop_triggered': True})
                         print(f"Early stopping triggered at epoch {epoch}. No improvement in loss for {early_stop_patience} consecutive epochs.")
-                        break
-        
+                        scheduler.step()
+                        epochs_no_improve = 0
+                        # break
+
         # After training, retrieve parameters
         with torch.no_grad():  # Ensure no gradients are computed in this block
             # Save model to file
@@ -245,7 +256,7 @@ class Trainer:
             model = self.train(max_rank, model=model, lr=lr, early_stop_patience=early_stop_patience, save_path=save_path)
         
         def compute_svd_target(model):
-            X,Y,_ = model.forward()
+            X,Y,*_ = model.forward()
             svd_target = torch.concatenate([X,Y], dim=0)
             return svd_target - svd_target.mean(dim=0).unsqueeze(0) # center svd_target -> PCA
         svd_target = compute_svd_target(model)

@@ -28,8 +28,10 @@ def run_experiment(config: Config,
         print(f"# Training {model_type} model...")
 
         # Determine the model and loss function based on config
-        model_class = LPCAModel if model_type == 'LPCA' else L2Model
-        loss_fn = LogisticLoss()
+        model_class = {'LPCA': LPCAModel, 'L2': L2Model}[model_type]
+        loss_type = 'logistic'
+        loss_type = 'hinge'
+        loss_fn = {'logistic': LogisticLoss, 'hinge': HingeLoss}[loss_type]()
         
         load_ckpt = config.get('load_ckpt')
         model_init = config.get('model_init') or 'random'

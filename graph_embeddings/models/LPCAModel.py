@@ -9,7 +9,7 @@ class LPCAModel(nn.Module):
                  Y: torch.Tensor, 
                  inference_only: bool=False):
         super(LPCAModel, self).__init__()
-        if X.shape == Y.shape: Y = Y.t() # 2D transpose
+        # if X.shape == Y.shape: Y = Y.t() # 2D transpose
         self.X = nn.Parameter(X) if not inference_only else X
         self.Y = nn.Parameter(Y) if not inference_only else Y
         self.S = None # ! only set if pretraining on SVD objective
@@ -17,7 +17,7 @@ class LPCAModel(nn.Module):
     @classmethod    
     def init_random(cls, n_row: int, n_col: int, rank: int):
         X = torch.randn(n_row, rank)
-        Y = torch.randn(rank, n_col)
+        Y = torch.randn(n_col, rank)
         return cls(X,Y)
 
     """
@@ -47,16 +47,16 @@ class LPCAModel(nn.Module):
                       S: torch.Tensor):
         S_inv_sqrt = torch.diag(torch.sqrt(F.softplus(S)) ** (-1))
         X = U @ S_inv_sqrt
-        Y = S_inv_sqrt @ V
+        Y = V @ S_inv_sqrt
         return cls(X,Y)
 
     def reconstruct(self):
         if self.S is not None:
             # _S = softplus(_S) for nonneg
             _S = torch.diag(F.softplus(self.S))
-            A_hat = self.X @ _S @ self.Y
+            A_hat = self.X @ _S @ self.Y.t()
         else:
-            A_hat = self.X @ self.Y
+            A_hat = self.X @ self.Y.t()
         return A_hat
 
     def forward(self):
