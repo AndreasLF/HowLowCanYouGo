@@ -2,7 +2,7 @@ import torch
 import torch.optim as optim
 import argparse
 
-from graph_embeddings.models.LPCAModel import LPCAModel
+from graph_embeddings.models.PCAModel import PCAModel
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.utils.load_data import load_adj
 from graph_embeddings.utils.loss import LogisticLoss, HingeLoss
@@ -14,9 +14,14 @@ import pdb
 import wandb
 from graph_embeddings.utils.logger import JSONLogger
 
+from graph_embeddings.utils.dataloader import CustomGraphDataLoader
+from graph_embeddings.data.make_datasets import get_data_from_torch_geometric
+from graph_embeddings.utils.config import Config
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model-type', type=str, default='LPCA', choices=['LPCA','L2'], help='Type of model and loss to use {LPCA, L2} (default: %(default)s)')
+    parser.add_argument('--model-type', type=str, default='PCA', choices=['PCA','L2'], help='Type of reconstruction model to use {LPCA, L2} (default: %(default)s)')
+    parser.add_argument('--loss-type', type=str, default='logistic', choices=['logistic','hinge'], help='Type of loss to use {logistic, hinge} (default: %(default)s)')
     parser.add_argument('--num-epochs', type=int, default=1000, metavar='N', help='number of epochs to train (default: %(default)s)')
     parser.add_argument('--rank', type=int, default=32, metavar='R', help='dimension of the embedding space (default: %(default)s)')
     parser.add_argument('--lr', type=float, default=1e-1, metavar='V', help='learning rate for training (default: %(default)s)')
@@ -35,18 +40,27 @@ if __name__ == '__main__':
     device = args.device
 
     # Load and prepare your data
-    adj = load_adj(f'./data/adj_matrices/{args.data}.pt').to(device)
+    # adj = load_adj(f'./data/adj_matrices/{args.data}.pt').to(device)
+    
+    cfg = Config("./configs/config.yaml")
+    raw_path = cfg.get("data", "raw_path")
+
+    dataset = get_data_from_torch_geometric("Planetoid", "Cora", raw_path)
+    # Get first graph in dataset
+    data = dataset[0]
+
+    dataloader = CustomGraphDataLoader(data, batch_size=data.num_nodes)
 
     model_init = args.model_init
 
-    model = LPCAModel if args.model_type == 'LPCA' else L2Model
-    loss_fn = LogisticLoss()
+    model = PCAModel if args.model_type == 'PCA' else L2Model
+    loss_fn = {"logistic": LogisticLoss, "hinge": HingeLoss}[args.loss_type]()
 
     # Initialize the trainer
-    trainer = Trainer(adj=adj, model_class=model, loss_fn=loss_fn, model_init=model_init,
+    trainer = Trainer(dataloader=dataloader, model_class=model, loss_fn=loss_fn, model_init=model_init,
                       threshold=1e-5, num_epochs=args.num_epochs, save_ckpt=args.save_ckpt,
                       load_ckpt=args.load_ckpt, device=args.device, 
-                      loggers=[JSONLogger])#, wandb])
+                      loggers=[])#, wandb])
     
     # Train one model model
     model = trainer.init_model(args.rank)

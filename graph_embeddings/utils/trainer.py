@@ -7,13 +7,13 @@ from tqdm import tqdm
 import os
 
 from graph_embeddings.models.L2Model import L2Model
-from graph_embeddings.models.LPCAModel import LPCAModel
+from graph_embeddings.models.PCAModel import PCAModel
 from graph_embeddings.utils.load_data import load_adj
 from graph_embeddings.utils.logger import JSONLogger
 
 class Trainer:
     def __init__(self, 
-                 adj, 
+                 dataloader, 
                  model_class, 
                  loss_fn, 
                  threshold, 
@@ -27,7 +27,7 @@ class Trainer:
                  dataset_path='not specified'):
         """Initialize the trainer."""   
         
-        self.adj = adj.to(device)
+        self.dataloader = dataloader
         self.model_class = model_class
         self.loss_fn = loss_fn
         self.threshold = threshold
@@ -49,17 +49,17 @@ class Trainer:
                    rank: int|None = None):
             if self.model_init == 'random':
                 assert rank is not None
-                model = self.model_class.init_random(self.adj.size(0), self.adj.size(1), rank).to(self.device)
+                model = self.model_class.init_random(self.dataloader.num_total_nodes, self.dataloader.num_total_nodes, rank).to(self.device)
             elif self.model_init == 'load':
                 model_params = torch.load(self.load_ckpt,map_location=self.device)
                 model = self.model_class(*model_params)
-            elif self.model_init == 'pre-svd':
-                assert rank is not None
-                U,_,V = torch.svd_lowrank(self.adj, q=rank)
-                model = self.model_class.init_pre_svd(U, V).to(self.device)
-            elif self.model_init == 'post-svd':
-                model_params = torch.load(self.load_ckpt,map_location=self.device)
-                model = self.model_class.init_post_svd(*model_params)
+            # elif self.model_init == 'pre-svd':
+            #     assert rank is not None
+            #     U,_,V = torch.svd_lowrank(self.adj, q=rank)
+            #     model = self.model_class.init_pre_svd(U, V).to(self.device)
+            # elif self.model_init == 'post-svd':
+            #     model_params = torch.load(self.load_ckpt,map_location=self.device)
+            #     model = self.model_class.init_post_svd(*model_params)
             else:
                 raise Exception(f"selected model initialization ({self.model_init}) is not currently implemented")
                 
@@ -67,7 +67,7 @@ class Trainer:
 
     def train(self, 
               rank: int, 
-              model: L2Model|LPCAModel|None = None,
+              model: L2Model|PCAModel|None = None,
               lr: float = 0.01, 
               early_stop_patience: float = None, 
               save_path: str = None):
@@ -108,6 +108,7 @@ class Trainer:
                                 })
 
 
+        """
         # ----------- Shift adjacency matrix -----------
         # shift adj matrix to -1's and +1's
         if loss_fn_name == 'PoissonLoss':
@@ -116,6 +117,12 @@ class Trainer:
         else:
             print("using shifted adjacency")
             A = self.adj*2 - 1 # shifted adjacency matrix used in loss function
+        # # ----------- Shift adjacency matrix -----------
+        # # shift adj matrix to -1's and +1's
+        # adj_s = self.adj*2 - 1
+        """
+            
+        adj = self.dataloader.full_adj.to(self.device)
 
         # ----------- Optimizer ----------- 
         optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -132,19 +139,30 @@ class Trainer:
             epochs_no_improve = 0  # Counter to keep track of epochs with no improvement
 
             for epoch in pbar:
+"""
                 # Forward pass
                 optimizer.zero_grad()
                 A_hat = model.reconstruct()
                 loss = loss_fn(A_hat, A)
                 loss.backward()
                 optimizer.step()
+"""
+
+                for b_idx, batch in enumerate(self.dataloader):
+                    batch.to(self.device)
+                    # Forward pass
+                    optimizer.zero_grad()
+                    A_hat = model.reconstruct(batch.indices) 
+                    loss = loss_fn(A_hat, batch.adj_s)
+                    loss.backward()
+                    optimizer.step()
 
                 if epoch % 100 == 0: # ! only check every {x}'th epoch
                     last_frob_epoch = epoch
                     # Compute Frobenius error for diagnostics
                     with torch.no_grad():  # Ensure no gradients are computed in this block
                         A_hat = model.reconstruct()
-                        frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
+                        frob_error_norm = self.calc_frob_error_norm(A_hat, adj)
 
                     # Log metrics to all loggers
                     metrics = {'epoch': epoch, 'loss': loss.item(), 'frob_error_norm': frob_error_norm.item()}

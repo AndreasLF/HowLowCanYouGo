@@ -62,16 +62,24 @@ class L2Model(nn.Module):
         return cls(X,Y,**kwargs)
 
     # ? multi-dimensional scaling for L2 model instead? 
-    def reconstruct(self):
+    def reconstruct(self, node_indices: torch.Tensor = None):
+        if node_indices is not None:
+            X = self.X[node_indices]
+            Y = self.Y[node_indices]
+        else:
+            X = self.X
+            Y = self.Y
+
         if self.S is not None:
             # _S = softplus(_S) for nonneg # _S = _S**(1/2) as it is mult on both matrices
             _S = torch.diag(torch.sqrt(F.softplus(self.S)))
-            norms = torch.norm((self.X@_S)[:,None] - (self.Y@_S), p=2, dim=-1)
+            norms = torch.norm((X@_S)[:,None] - (Y@_S), p=2, dim=-1)
             # norms = torch.cdist(self.X@_S, self.Y@_S, p=2)
         else:
-            norms = torch.norm(self.X[:,None] - self.Y, p=2, dim=-1) # ? seems like better training than with cdist, why?
+            norms = torch.norm(X[:,None] - Y, p=2, dim=-1) # ? seems like better training than with cdist, why?
             # norms = torch.cdist(self.X, self.Y, p=2)
         A_hat = - norms + self.beta
+        
         return A_hat
 
     def forward(self):

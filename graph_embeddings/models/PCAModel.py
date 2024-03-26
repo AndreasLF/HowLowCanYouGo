@@ -2,13 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# Logistic PCA model
-class LPCAModel(nn.Module):
+# PCA reconstruction model
+class PCAModel(nn.Module):
     def __init__(self, 
                  X: torch.Tensor, 
                  Y: torch.Tensor, 
                  inference_only: bool=False):
-        super(LPCAModel, self).__init__()
+        super(PCAModel, self).__init__()
         # if X.shape == Y.shape: Y = Y.t() # 2D transpose
         self.X = nn.Parameter(X) if not inference_only else X
         self.Y = nn.Parameter(Y) if not inference_only else Y
