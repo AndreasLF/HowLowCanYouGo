@@ -9,7 +9,8 @@ import argparse
 # import loggers
 import wandb
 from graph_embeddings.utils.logger import JSONLogger
-from graph_embeddings.utils.load_data import load_adj
+from graph_embeddings.utils.dataloader import CustomGraphDataLoader
+from graph_embeddings.data.make_datasets import get_data_from_torch_geometric
 
 from utils.config import Config
 
@@ -20,7 +21,19 @@ def run_experiment(config: Config,
                    loglevel=2):
     # Load and prepare your data
     dataset_path = config.get("dataset_path")
-    adj = load_adj(dataset_path).to(config.get('device'))
+    # adj = load_adj(dataset_path).to(config.get('device'))
+
+
+    cfg = Config("./configs/config.yaml")
+    raw_path = cfg.get("data", "raw_path")
+
+    dataset = get_data_from_torch_geometric("Planetoid", "Cora", raw_path)
+    # Get first graph in dataset
+    data = dataset[0]
+
+    # Either use the batch size from the config or set it to the number of nodes i.e. the whole graph
+    batch_size = config.get('batch_size') or int(data.num_nodes)
+    dataloader = CustomGraphDataLoader(data, batch_size=batch_size)
     
     model_types = config.get('model_types')
     loss_types = config.get('loss_types')
@@ -39,11 +52,10 @@ def run_experiment(config: Config,
             loggers = {0: [], 1: [JSONLogger], 2: [JSONLogger, wandb]}[loglevel]
             
             # Initialize the trainer
-            trainer = Trainer(adj=adj, model_class=model_class, 
+            trainer = Trainer(dataloader=dataloader, model_class=model_class, 
                               loss_fn=loss_fn, model_init=model_init,
                               threshold=1e-10, num_epochs=config.get("num_epochs"),
-                              device=device, max_eval=config.get('max_eval'), 
-                              loggers=loggers, dataset_path=dataset_path, 
+                              device=device, loggers=loggers, dataset_path=dataset_path, 
                               save_ckpt=results_folder, load_ckpt=load_ckpt)
             
             # If rank_range is specified, search for the optimal rank

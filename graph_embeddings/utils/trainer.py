@@ -88,6 +88,7 @@ class Trainer:
         num_epochs = self.num_epochs
         dataset_path = self.dataset_path
         full_reconstruction = False
+        batch_size = self.dataloader.batch_size
 
         # ----------- Initialize logging -----------
         # get loss_fn function name
@@ -104,7 +105,8 @@ class Trainer:
                                 'loss_fn': loss_fn_name, 
                                 'model_class': model_class_name,
                                 'dataset_path': dataset_path,
-                                'early_stop_patience': early_stop_patience
+                                'early_stop_patience': early_stop_patience,
+                                'batch_size': batch_size
                                 })
 
 
@@ -122,7 +124,7 @@ class Trainer:
         # adj_s = self.adj*2 - 1
         """
             
-        adj = self.dataloader.full_adj.to(self.device)
+        self.adj = self.dataloader.full_adj.to(self.device) # ! used for small graphs for FROB
 
         # ----------- Optimizer ----------- 
         optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -139,14 +141,16 @@ class Trainer:
             epochs_no_improve = 0  # Counter to keep track of epochs with no improvement
 
             for epoch in pbar:
-"""
+                """
                 # Forward pass
                 optimizer.zero_grad()
                 A_hat = model.reconstruct()
                 loss = loss_fn(A_hat, A)
                 loss.backward()
                 optimizer.step()
-"""
+                """
+
+                losses = []
 
                 for b_idx, batch in enumerate(self.dataloader):
                     batch.to(self.device)
@@ -156,21 +160,24 @@ class Trainer:
                     loss = loss_fn(A_hat, batch.adj_s)
                     loss.backward()
                     optimizer.step()
+                    losses.append(loss.item())
+
+                epoch_loss = sum(losses) / len(losses)
 
                 if epoch % 100 == 0: # ! only check every {x}'th epoch
                     last_frob_epoch = epoch
                     # Compute Frobenius error for diagnostics
                     with torch.no_grad():  # Ensure no gradients are computed in this block
                         A_hat = model.reconstruct()
-                        frob_error_norm = self.calc_frob_error_norm(A_hat, adj)
+                        frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
 
                     # Log metrics to all loggers
-                    metrics = {'epoch': epoch, 'loss': loss.item(), 'frob_error_norm': frob_error_norm.item()}
+                    metrics = {'epoch': epoch, 'loss': epoch_loss, 'frob_error_norm': frob_error_norm.item()}
                     for logger in self.loggers:
                         logger.log(metrics)
 
                 # update progress bar
-                pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={loss:.1f} frob_err@{last_frob_epoch}={frob_error_norm or .0:.4f}")
+                pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_frob_epoch}={frob_error_norm or .0:.4f}")
                 # Break if Froebenius error is less than threshold
                 if frob_error_norm <= self.threshold:
                     pbar.close()

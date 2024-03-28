@@ -5,7 +5,7 @@ import argparse
 from graph_embeddings.models.PCAModel import PCAModel
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.utils.load_data import load_adj
-from graph_embeddings.utils.loss import LogisticLoss, HingeLoss
+from graph_embeddings.utils.loss import LogisticLoss, HingeLoss, PoissonLoss
 from graph_embeddings.utils.trainer import Trainer
 
 import pdb
@@ -49,12 +49,12 @@ if __name__ == '__main__':
     # Get first graph in dataset
     data = dataset[0]
 
-    dataloader = CustomGraphDataLoader(data, batch_size=data.num_nodes)
+    dataloader = CustomGraphDataLoader(data, batch_size=int(.25*data.num_nodes))
 
     model_init = args.model_init
 
     model = PCAModel if args.model_type == 'PCA' else L2Model
-    loss_fn = {"logistic": LogisticLoss, "hinge": HingeLoss}[args.loss_type]()
+    loss_fn = {"logistic": LogisticLoss, "hinge": HingeLoss, "poisson": PoissonLoss}[args.loss_type]()
 
     # Initialize the trainer
     trainer = Trainer(dataloader=dataloader, model_class=model, loss_fn=loss_fn, model_init=model_init,
