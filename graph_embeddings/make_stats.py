@@ -120,7 +120,8 @@ if __name__ == "__main__":
 
 
         # Add two empty columns for the bold rows
-        df_loaded["EFD"] = ""
+        df_loaded["EFD (L2)"] = ""
+        df_loaded["EFD (LPCA)"] = ""
         df_loaded["Search start"] = ""
 
 
@@ -128,7 +129,7 @@ if __name__ == "__main__":
         df_loaded.sort_values(by="Nodes", inplace=True)
 
         # dont't use toprule, midrule, bottomrule, instead use \hline
-        latex_code = df_loaded.to_latex(index=False, float_format="%.2f", column_format="l|ccccc|cc")
+        latex_code = df_loaded.to_latex(index=False, float_format="%.2f", column_format="l|ccccc|ccc")
 
         # replace top and bottom rule with \hline
         latex_code = latex_code.replace("\\toprule", "\\hline")
