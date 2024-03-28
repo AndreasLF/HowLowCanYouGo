@@ -10,6 +10,27 @@ from torch_geometric.utils import select, subgraph
 from torch_geometric.data import Data
 import pdb
 
+def edge_index_to_adjacency_matrix(edge_index):
+    # Identify all unique nodes and their new indices
+    unique_nodes, new_indices = torch.unique(edge_index, return_inverse=True)
+    
+    # Number of nodes in the reduced graph
+    num_nodes = len(unique_nodes)
+    
+    # Reshape new_indices to match the shape of edge_index for mapping
+    new_edge_index = new_indices.view(edge_index.shape)
+    
+    # Create a tensor of ones with the same length as the new edge index to represent edge weights
+    edge_weights = torch.ones(new_edge_index.size(1), dtype=torch.float32)
+    
+    # Create a sparse tensor with new edge indices and weights using torch.sparse_coo_tensor
+    adjacency_matrix = torch.sparse_coo_tensor(new_edge_index, edge_weights, (num_nodes, num_nodes)).to_dense()
+    
+    # Set the diagonal elements to 1
+    adjacency_matrix.fill_diagonal_(1)
+    
+    return adjacency_matrix
+
 # Monkey patch the subgraph method on the Data class to not relabel nodes
 def subgraph_custom(self, subset: Tensor) -> 'Data':
         r"""Returns the induced subgraph given by the node indices
@@ -56,14 +77,10 @@ class Batch:
     @cached_property
     def indices(self):
         return self.sub_graph.edge_index.unique()
-
+  
     @cached_property
     def adj(self):
-        A = to_dense_adj(self.sub_graph.edge_index).squeeze(0)
-        A = A[~torch.all(A == 0, dim=1)]
-        A = A[:, ~torch.all(A == 0, dim=0)]
-        # add 1 to diagonal
-        A = A.fill_diagonal_(1)
+        A = edge_index_to_adjacency_matrix(self.sub_graph.edge_index)
         return A
 
     @cached_property
