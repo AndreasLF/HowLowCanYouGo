@@ -11,32 +11,55 @@ import os.path as osp
 import scipy.io
 
 from torch_geometric.datasets.snap_dataset import read_wiki
-
+from typing import List
+from torch_geometric.data import Data
+import numpy as np
+from torch_geometric.utils import coalesce
 
 # Monekypatch: Add the ca-HepPh, ca-GrQc and p2p-Gnutella04 datasets to the available datasets in SNAPDataset
 SNAPDataset.available_datasets.update({
     'ca-hepph': ['ca-HepPh.txt.gz'], # Add ca-HepPh dataset to available datasets.
     'ca-grqc': ['ca-GrQc.txt.gz'], # Add ca-GrQc dataset to available datasets.
-    'p2p-gnutella04': ['p2p-Gnutella04.txt.gz'] # Add p2p-Gnutella04 dataset to available datasets.
+    'p2p-gnutella04': ['p2p-Gnutella04.txt.gz'], # Add p2p-Gnutella04 dataset to available datasets.
+    'email-enron': ['email-Enron.txt.gz'] # Add email-Enron dataset to available datasets.
 })
 print(SNAPDataset.available_datasets)
 
 # Save the original process method
 original_process = SNAPDataset.process
 
+
+def read_txt_dataset(files: List[str], name: str) -> List[Data]:
+    import pandas as pd
+
+    edge_index = pd.read_csv(files[0], sep='\t', header=None, comment="#",
+                             dtype=np.int64)
+    edge_index = torch.from_numpy(edge_index.values).t()
+
+    idx = torch.unique(edge_index.flatten())
+    idx_assoc = torch.full((edge_index.max() + 1, ), -1, dtype=torch.long)
+    idx_assoc[idx] = torch.arange(idx.size(0))
+
+    edge_index = idx_assoc[edge_index]
+    num_nodes = edge_index.max().item() + 1
+    edge_index = coalesce(edge_index, num_nodes=num_nodes)
+
+    return [Data(edge_index=edge_index, num_nodes=num_nodes)]
+
 # Make a new process method, monkey patching the original one
 def process_wrapper(self):
+    print(f"Processing dataset: {self.name}")
     # The ca-HepPh dataset has the same format as the wiki-Vote dataset. Therefore, we can use the same processing function. 
     # This is a temporary fix until the SNAPDataset class is updated to include the ca-HepPh dataset. Should probably do a pull request to the torch_geometric repo to include this dataset.
     # ! Note: It seems like there is bug in the read_soc in snap_dataset.py. Looks like the shapes do not match with the graph data. Omit using it for now.
-    if self.name.startswith('ca-') or self.name.startswith('p2p-'):
+    if self.name.startswith('ca-') or self.name.startswith('p2p-') or self.name.startswith('email-'):
         raw_dir = osp.join(self.root, self.name, 'raw')
         filenames = os.listdir(self.raw_dir)
         if len(filenames) == 1 and osp.isdir(osp.join(raw_dir, filenames[0])):
             raw_dir = osp.join(raw_dir, filenames[0])
 
         raw_files = sorted([osp.join(raw_dir, f) for f in os.listdir(raw_dir)])
-        data_list = read_wiki(raw_files, self.name[5:])
+        data_list = read_txt_dataset(raw_files, self.name[5:])
 
         if len(data_list) > 1 and self.pre_filter is not None:
             data_list = [data for data in data_list if self.pre_filter(data)]
