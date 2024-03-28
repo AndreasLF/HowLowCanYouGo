@@ -39,7 +39,7 @@ run_experiments:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/run_experiments.py $(ARGS)
 
 DEVICE = cuda
-RANK = 8
+RANK = 50
 LR = 1.0
 EPOCHS = 10_000
 TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
@@ -77,3 +77,11 @@ train-ppca:
 
 get_stats:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/make_stats.py --print-latex
+
+profile:
+	$(PYTHON_INTERPRETER) -m cProfile -o profile.prof $(PROJECT_NAME)/train.py \
+	--model-type L2 --loss-type logistic \
+	--rank $(RANK) \
+	--lr $(LR) --num-epochs $(EPOCHS) \
+	--model-init random \
+	--device $(DEVICE)
