@@ -1,7 +1,7 @@
 dataset_path: './data/adj_matrices/Cora.pt'
 model_types: ['L2', 'PCA']
 loss_types: ['logistic', 'hinge']
-num_epochs: 50_000
+num_epochs: 5_000
 
 
 model_init: 'random'

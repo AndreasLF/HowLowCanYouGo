@@ -73,11 +73,9 @@ class L2Model(nn.Module):
         if self.S is not None:
             # _S = softplus(_S) for nonneg # _S = _S**(1/2) as it is mult on both matrices
             _S = torch.diag(torch.sqrt(F.softplus(self.S)))
-            norms = torch.norm((X@_S)[:,None] - (Y@_S), p=2, dim=-1)
-            # norms = torch.cdist(self.X@_S, self.Y@_S, p=2)
+            norms = torch.norm((X@_S)[:,None] - (Y@_S), p=2, dim=-1) # norms = torch.cdist(self.X@_S, self.Y@_S, p=2)
         else:
-            norms = torch.norm(X[:,None] - Y, p=2, dim=-1) # ? seems like better training than with cdist, why?
-            # norms = torch.cdist(self.X, self.Y, p=2)
+            norms = torch.norm(X[:,None] - Y, p=2, dim=-1) # ? seems like better training than with cdist, why? # norms = torch.cdist(self.X, self.Y, p=2)
         A_hat = - norms + self.beta
         
         return A_hat
