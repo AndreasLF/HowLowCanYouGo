@@ -27,7 +27,17 @@ def run_experiment(config: Config,
     cfg = Config("./configs/config.yaml")
     raw_path = cfg.get("data", "raw_path")
 
-    dataset = get_data_from_torch_geometric("Planetoid", "Cora", raw_path)
+    dat = config.get("dataset_ref")
+    if not dat:
+        raise ValueError("Please specify a dataset_ref in the experiment config file")
+    if "pytorch-geometric" in dat.lower(): 
+        src_split = dat.split("/")
+        dataset = get_data_from_torch_geometric(src_split[1], src_split[2], raw_path)
+        data = dataset[0]
+    elif "snapdataset" in dat.lower():
+        src_split = dat.split("/")
+        dataset = get_data_from_torch_geometric(src_split[0], src_split[1], raw_path)
+        data = dataset[0]
     # Get first graph in dataset
     data = dataset[0]
 
