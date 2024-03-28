@@ -31,8 +31,9 @@ def run_experiment(config: Config,
     # Get first graph in dataset
     data = dataset[0]
 
-    # dataloader = CustomGraphDataLoader(data, batch_size=data.num_nodes)
-    dataloader = CustomGraphDataLoader(data, batch_size=int(.25*data.num_nodes))
+    # Either use the batch size from the config or set it to the number of nodes i.e. the whole graph
+    batch_size = config.get('batch_size') or int(data.num_nodes)
+    dataloader = CustomGraphDataLoader(data, batch_size=batch_size)
     
     model_types = config.get('model_types')
     loss_types = config.get('loss_types')

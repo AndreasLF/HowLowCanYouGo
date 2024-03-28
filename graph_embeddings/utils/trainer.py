@@ -88,6 +88,7 @@ class Trainer:
         num_epochs = self.num_epochs
         dataset_path = self.dataset_path
         full_reconstruction = False
+        batch_size = self.dataloader.batch_size
 
         # ----------- Initialize logging -----------
         # get loss_fn function name
@@ -104,7 +105,8 @@ class Trainer:
                                 'loss_fn': loss_fn_name, 
                                 'model_class': model_class_name,
                                 'dataset_path': dataset_path,
-                                'early_stop_patience': early_stop_patience
+                                'early_stop_patience': early_stop_patience,
+                                'batch_size': batch_size
                                 })
 
 
