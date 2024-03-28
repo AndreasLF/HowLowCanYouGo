@@ -150,6 +150,8 @@ class Trainer:
                 optimizer.step()
                 """
 
+                losses = []
+
                 for b_idx, batch in enumerate(self.dataloader):
                     batch.to(self.device)
                     # Forward pass
@@ -158,6 +160,9 @@ class Trainer:
                     loss = loss_fn(A_hat, batch.adj_s)
                     loss.backward()
                     optimizer.step()
+                    losses.append(loss.item())
+
+                epoch_loss = sum(losses) / len(losses)
 
                 if epoch % 100 == 0: # ! only check every {x}'th epoch
                     last_frob_epoch = epoch
@@ -167,12 +172,12 @@ class Trainer:
                         frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
 
                     # Log metrics to all loggers
-                    metrics = {'epoch': epoch, 'loss': loss.item(), 'frob_error_norm': frob_error_norm.item()}
+                    metrics = {'epoch': epoch, 'loss': epoch_loss, 'frob_error_norm': frob_error_norm.item()}
                     for logger in self.loggers:
                         logger.log(metrics)
 
                 # update progress bar
-                pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={loss:.1f} frob_err@{last_frob_epoch}={frob_error_norm or .0:.4f}")
+                pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_frob_epoch}={frob_error_norm or .0:.4f}")
                 # Break if Froebenius error is less than threshold
                 if frob_error_norm <= self.threshold:
                     pbar.close()
