@@ -18,8 +18,7 @@ def run_experiment(config: Config,
                    device: str = 'cpu', 
                    results_folder: str = 'results', 
                    experiment_name: str = 'experiment', 
-                   loglevel: int = 2,
-                   recons_check: str = 'frob'):
+                   loglevel: int = 2):
     # Load and prepare your data
     dataset_path = config.get("dataset_path")
     # adj = load_adj(dataset_path).to(config.get('device'))
@@ -62,12 +61,13 @@ def run_experiment(config: Config,
             
             loggers = {0: [], 1: [JSONLogger], 2: [JSONLogger, wandb]}[loglevel]
             # Initialize the trainer
+
+            recons_check = config.get("recons_check") or "frob"
             trainer = Trainer(dataloader=dataloader, model_class=model_class, 
                               loss_fn=loss_fn, model_init=model_init,
                               threshold=1e-10, num_epochs=config.get("num_epochs"),
                               device=device, loggers=loggers, dataset_path=dataset_path, 
                               save_ckpt=results_folder, load_ckpt=load_ckpt, reconstruction_check=recons_check)
-            
             # If rank_range is specified, search for the optimal rank
             rank_range = config.get('rank_range')
             if rank_range:
@@ -103,7 +103,7 @@ def main():
             # print the whole config
             print(f"{'='*50}\n{exp_config}\n{'='*50}")
 
-            run_experiment(config=exp_config, device=device, experiment_name=experiment['name'], loglevel=args.loglevel, recons_check=args.recons_check)
+            run_experiment(config=exp_config, device=device, experiment_name=experiment['name'], loglevel=args.loglevel)
     
     else:
         # check if experiment is specified
@@ -127,7 +127,7 @@ def main():
         print(exp_config)
         print("="*50)
 
-        run_experiment(config=exp_config, device=device, experiment_name=exp_name, loglevel=args.loglevel, recons_check=args.recons_check)
+        run_experiment(config=exp_config, device=device, experiment_name=exp_name, loglevel=args.loglevel)
 
 if __name__ == '__main__':
     main()
