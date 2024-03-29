@@ -16,13 +16,58 @@ from torch_geometric.data import Data
 import numpy as np
 from torch_geometric.utils import coalesce
 
-# Monekypatch: Add the ca-HepPh, ca-GrQc and p2p-Gnutella04 datasets to the available datasets in SNAPDataset
-SNAPDataset.available_datasets.update({
+
+extra_datasets = {
     'ca-hepph': ['ca-HepPh.txt.gz'], # Add ca-HepPh dataset to available datasets.
     'ca-grqc': ['ca-GrQc.txt.gz'], # Add ca-GrQc dataset to available datasets.
+    'ca-astroph': ['ca-AstroPh.txt.gz'],
+    'ca-condmat': ['ca-CondMat.txt.gz'],
+    'ca-hepth': ['ca-HepTh.txt.gz'],
     'p2p-gnutella04': ['p2p-Gnutella04.txt.gz'], # Add p2p-Gnutella04 dataset to available datasets.
-    'email-enron': ['email-Enron.txt.gz'] # Add email-Enron dataset to available datasets.
-})
+    'email-enron': ['email-Enron.txt.gz'], # Add email-Enron dataset to available datasets.
+    'email-euall': ['email-EuAll.txt.gz'], # Add email-EuAll dataset to available datasets.
+    'soc-epinions1': ['soc-Epinions1.txt.gz'],
+    'soc-livejournal1': ['soc-LiveJournal1.txt.gz'],
+    'soc-pokec-relationships': ['soc-pokec-relationships.txt.gz'],
+    'soc-slashdot0811': ['soc-Slashdot0811.txt.gz'],
+    'soc-slashdot0902': ['soc-Slashdot0902.txt.gz'],
+    'com-orkut': ['bigdata/communities/com-orkut.ungraph.txt.gz'],
+    'com-youtube': ['bigdata/communities/com-youtube.ungraph.txt.gz'],
+    'com-dblp': ['bigdata/communities/com-dblp.ungraph.txt.gz'],
+    'com-amazon': ['bigdata/communities/com-amazon.ungraph.txt.gz'],
+    'wiki-talk': ['wiki-Talk.txt.gz'],
+    'cit-hepph': ['cit-HepPh.txt.gz'],
+    'cit-hepth': ['cit-HepTh.txt.gz'],
+    'cit-patents': ['cit-Patents.txt.gz'],
+    'web-berkstan': ['web-BerkStan.txt.gz'],
+    'web-google': ['web-Google.txt.gz'],
+    'web-notredame': ['web-NotreDame.txt.gz'],
+    'web-stanford': ['web-Stanford.txt.gz'],
+    'amazon0302': ['amazon0302.txt.gz'],
+    'amazon0312': ['amazon0312.txt.gz'],
+    'amazon0505': ['amazon0505.txt.gz'],
+    'amazon0601': ['amazon0601.txt.gz'],
+    'p2p-gnutella04': ['p2p-Gnutella04.txt.gz'],
+    'p2p-gnutella05': ['p2p-Gnutella05.txt.gz'],
+    'p2p-gnutella06': ['p2p-Gnutella06.txt.gz'],
+    'p2p-gnutella08': ['p2p-Gnutella08.txt.gz'],
+    'p2p-gnutella09': ['p2p-Gnutella09.txt.gz'],
+    'p2p-gnutella24': ['p2p-Gnutella24.txt.gz'],
+    'p2p-gnutella25': ['p2p-Gnutella25.txt.gz'],
+    'p2p-gnutella30': ['p2p-Gnutella30.txt.gz'],
+    'p2p-gnutella31': ['p2p-Gnutella31.txt.gz'],
+    'roadnet-ca': ['roadNet-CA.txt.gz'],
+    'roadnet-pa': ['roadNet-PA.txt.gz'],
+    'roadnet-tx': ['roadNet-TX.txt.gz'],
+    'as-733': ['as20000102.txt.gz'],
+    'as-skitter': ['as-skitter.txt.gz'],
+    'as-caida': ['as-caida20071105.txt.gz'],
+    'loc-gowalla': ['loc-gowalla_edges.txt.gz'],
+    'loc-brightkite': ['loc-brightkite_edges.txt.gz']
+    }
+
+# Monekypatch: Add the datasets to the available datasets in SNAPDataset
+SNAPDataset.available_datasets.update(extra_datasets)
 print(SNAPDataset.available_datasets)
 
 # Save the original process method
@@ -52,7 +97,7 @@ def process_wrapper(self):
     # The ca-HepPh dataset has the same format as the wiki-Vote dataset. Therefore, we can use the same processing function. 
     # This is a temporary fix until the SNAPDataset class is updated to include the ca-HepPh dataset. Should probably do a pull request to the torch_geometric repo to include this dataset.
     # ! Note: It seems like there is bug in the read_soc in snap_dataset.py. Looks like the shapes do not match with the graph data. Omit using it for now.
-    if self.name.startswith('ca-') or self.name.startswith('p2p-') or self.name.startswith('email-'):
+    if self.name.lower() in extra_datasets.keys():
         raw_dir = osp.join(self.root, self.name, 'raw')
         filenames = os.listdir(self.raw_dir)
         if len(filenames) == 1 and osp.isdir(osp.join(raw_dir, filenames[0])):
