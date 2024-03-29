@@ -97,6 +97,10 @@ class Trainer:
         dataset_path = self.dataset_path
         full_reconstruction = False
         batch_size = self.dataloader.batch_size
+        last_recons_check_epoch = None
+        perc_edges_reconstructed = None
+        frob_error_norm = None
+        fully_reconstructed = False
 
         # ----------- Initialize logging -----------
         # get loss_fn function name
@@ -175,9 +179,8 @@ class Trainer:
 
 
                 if self.reconstruction_check == "frob":
-                    if epoch % 100 == 0: # ! only check every {x}'th epoch
-
-                        last_frob_epoch = epoch
+                    if epoch % 100 == 0 and epoch != 0: # ! only check every {x}'th epoch
+                        last_recons_check_epoch = epoch
                         # Compute Frobenius error for diagnostics
                         with torch.no_grad():  # Ensure no gradients are computed in this block
                             A_hat = model.reconstruct()
@@ -191,11 +194,11 @@ class Trainer:
                         fully_reconstructed = frob_error_norm <= self.threshold
 
                     # update progress bar
-                    pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_frob_epoch}={frob_error_norm or .0:.4f}")
+                    pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_recons_check_epoch}={frob_error_norm or .0:.4f}")
                         
                 elif self.reconstruction_check == "neigh":
-                    if epoch % 100 == 0: # ! only check every {x}'th epoch
-
+                    if epoch % 100 == 0 and epoch != 0: # ! only check every {x}'th epoch
+                        print("TEST1")
                         last_recons_check_epoch = epoch
 
                         # Compute Frobenius error for diagnostics
@@ -207,7 +210,7 @@ class Trainer:
                         fully_reconstructed = len(common_edges) == self.dataloader.data.num_edges
 
                     # update progress bar
-                    pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={epoch_loss:.1f} edges_reconstructed@{last_recons_check_epoch}={perc_edges_reconstructed:.2f}%")
+                    pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={epoch_loss:.1f} edges_reconstructed@{last_recons_check_epoch}={perc_edges_reconstructed or .0:.2f}%")
                         
 
                 
