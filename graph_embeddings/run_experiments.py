@@ -18,7 +18,8 @@ def run_experiment(config: Config,
                    device: str = 'cpu', 
                    results_folder: str = 'results', 
                    experiment_name: str = 'experiment', 
-                   loglevel=2):
+                   loglevel: int = 2,
+                   recons_check: str = 'frob'):
     # Load and prepare your data
     dataset_path = config.get("dataset_path")
     # adj = load_adj(dataset_path).to(config.get('device'))
@@ -60,13 +61,12 @@ def run_experiment(config: Config,
             model_init = config.get('model_init') or 'random'
             
             loggers = {0: [], 1: [JSONLogger], 2: [JSONLogger, wandb]}[loglevel]
-            
             # Initialize the trainer
             trainer = Trainer(dataloader=dataloader, model_class=model_class, 
                               loss_fn=loss_fn, model_init=model_init,
                               threshold=1e-10, num_epochs=config.get("num_epochs"),
                               device=device, loggers=loggers, dataset_path=dataset_path, 
-                              save_ckpt=results_folder, load_ckpt=load_ckpt)
+                              save_ckpt=results_folder, load_ckpt=load_ckpt, reconstruction_check=recons_check)
             
             # If rank_range is specified, search for the optimal rank
             rank_range = config.get('rank_range')
@@ -83,7 +83,8 @@ def main():
     parser.add_argument('--all', action='store_true', help='Run all experiments')
     parser.add_argument('--experiment', type=str, default=None, help='Run a specific experiment')
     parser.add_argument('--loglevel', default="2", choices=["0","1","2"], help='Log level [0: nothing, 1: logs to JSON, 2: logs to JSON and WANDB]')
-    
+    parser.add_argument('--recons-check', default="frob", choices=["frob","neigh"], help='Method to check for full reconstruction [frob: frobenius error, neigh: nearest neighbours in embedding space]')
+
     args = parser.parse_args()
     device = args.device
     args.loglevel = int(args.loglevel)
@@ -102,7 +103,7 @@ def main():
             # print the whole config
             print(f"{'='*50}\n{exp_config}\n{'='*50}")
 
-            run_experiment(config=exp_config, device=device, experiment_name=experiment['name'], loglevel=args.loglevel)
+            run_experiment(config=exp_config, device=device, experiment_name=experiment['name'], loglevel=args.loglevel, recons_check=args.recons_check)
     
     else:
         # check if experiment is specified
@@ -126,7 +127,7 @@ def main():
         print(exp_config)
         print("="*50)
 
-        run_experiment(config=exp_config, device=device, experiment_name=exp_name, loglevel=args.loglevel)
+        run_experiment(config=exp_config, device=device, experiment_name=exp_name, loglevel=args.loglevel, recons_check=args.recons_check)
 
 if __name__ == '__main__':
     main()

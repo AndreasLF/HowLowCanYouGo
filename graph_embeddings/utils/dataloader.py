@@ -21,7 +21,7 @@ def edge_index_to_adjacency_matrix(edge_index):
     new_edge_index = new_indices.view(edge_index.shape)
     
     # Create a tensor of ones with the same length as the new edge index to represent edge weights
-    edge_weights = torch.ones(new_edge_index.size(1), dtype=torch.float32)
+    edge_weights = torch.ones(new_edge_index.size(1), dtype=torch.float32, device=edge_index.device)
     
     # Create a sparse tensor with new edge indices and weights using torch.sparse_coo_tensor
     adjacency_matrix = torch.sparse_coo_tensor(new_edge_index, edge_weights, (num_nodes, num_nodes)).to_dense()
@@ -64,7 +64,6 @@ def subgraph_custom(self, subset: Tensor) -> 'Data':
         return data
 
 Data.subgraph = subgraph_custom
-
 
 class Batch:
     def __init__(self, sub_graph: torch_geometric.data.Data):
