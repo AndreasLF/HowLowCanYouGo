@@ -38,14 +38,18 @@ datasets:
 run_experiments:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/run_experiments.py $(ARGS)
 
-DEVICE = cuda
+DEVICE = cpu
 RANK = 8
 LR = 1.0
 EPOCHS = 10_000
+DATASET = Planetoid/PubMed
+BATCH_SIZE_PERCENT = 1.0 # 1.0 means full batch
 TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
 		--rank $(RANK) \
 		--lr $(LR) --num-epochs $(EPOCHS) \
 		--model-init random \
+		--dataset $(DATASET) \
+		--batch-size-percent $(BATCH_SIZE_PERCENT) \
 		--device $(DEVICE)
 
 train-ll2:
