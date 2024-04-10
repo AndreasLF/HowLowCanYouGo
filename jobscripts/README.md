@@ -31,9 +31,9 @@ export MEM_GB=16
 To submit a job, run the following command in the terminal:
 
 ```sh
-./submit_job1.sh EXPERIMENT_NAME
+./submit_job1.sh EXPERIMENT_NAME [LOSS_TYPE MODEL_TYPE]
 ```
 
-Where `EXPERIMENT_NAME` is the name of the experiment you want to run as specified in the config file.
+Where `EXPERIMENT_NAME` is the name of the experiment you want to run as specified in the config file. `[LOSS_TYPE MODEL_TYPE]` are optional arguments that can be used to specify the loss and model type. If not provided, the values from the config file will be used.
 
 This will populate the `jobscript_template1.sh` with the parameters defined in `env_vars.sh` along with the provided `EXPERIMENT_NAME` and submit the job to the cluster.

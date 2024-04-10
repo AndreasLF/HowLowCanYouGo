@@ -36,4 +36,4 @@ module load cuda/11.6
 source ${VENV_PATH}
 # Change to the working directory
 cd ${WORKING_DIR}
-make run_experiments ARGS="--device cuda --experiment ${EXPERIMENT_NAME}" # This is the line that runs the experiment, experiment name is passed as an argument
+make run_experiments ARGS="${RUN_EXPERIMENTS_ARGS}" # This is the line that runs the experiment, experiment name is passed as an argument

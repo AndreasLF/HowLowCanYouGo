@@ -83,7 +83,9 @@ def main():
     parser.add_argument('--all', action='store_true', help='Run all experiments')
     parser.add_argument('--experiment', type=str, default=None, help='Run a specific experiment')
     parser.add_argument('--loglevel', default="2", choices=["0","1","2"], help='Log level [0: nothing, 1: logs to JSON, 2: logs to JSON and WANDB]')
-    
+    parser.add_argument('--loss', type=str, default=None, help='Loss function to use (logistic, hinge, poisson). Default uses config file, only pass this argument to overwrite it.')
+    parser.add_argument('--model', type=str, default=None, help='Model to use (PCA, L2). Default uses config file, only pass this argument to overwrite it.')
+
     args = parser.parse_args()
     device = args.device
     args.loglevel = int(args.loglevel)
@@ -98,6 +100,12 @@ def main():
         for experiment in main_config.get('experiments'):
             print(f"Running experiment {experiment['name']} from config {experiment['config_path']}...")
             exp_config = Config(experiment['config_path'])
+
+            # check if loss and model are specified
+            if args.loss:
+                exp_config.set('loss_types', [args.loss])
+            if args.model:
+                exp_config.set('model_types', [args.model])
 
             # print the whole config
             print(f"{'='*50}\n{exp_config}\n{'='*50}")
