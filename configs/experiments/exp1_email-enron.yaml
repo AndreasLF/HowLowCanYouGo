@@ -1,13 +1,11 @@
-dataset_path: './data/adj_matrices/p2p-Gnutella04.pt'
-dataset_ref: 'SNAPDataset/p2p-Gnutella04'
+dataset_path: './data/adj_matrices/email-enron.pt'
 model_types: ['L2', 'PCA']
 loss_types: ['logistic', 'hinge']
 num_epochs: 50_000
-
-
+batch_size: 2_000
 model_init: 'random'
 lr: 0.1
 early_stop_patience: 500
 rank_range:
   min: 1
-  max: 75
+  max: 150

@@ -6,27 +6,9 @@ from torch_geometric.utils import to_dense_adj
 from functools import cached_property
 from torch_geometric.utils import subgraph
 import copy
-
 from torch_geometric.utils import select, subgraph
-
-from torch_geometric.data import Data, HeteroData
-
-# def collate_fn_custom(self, index):
-#         if not isinstance(index, Tensor):
-#             index = torch.tensor(index)
-
-#         if isinstance(self.data, Data):
-#             return self.data.subgraph(index), index
-
-#         elif isinstance(self.data, HeteroData):
-#             node_dict = {
-#                 key: index[(index >= start) & (index < end)] - start
-#                 for key, (start, end) in self.node_dict.items()
-#             }
-#             return self.data.subgraph(node_dict), index
-
-# RandomNodeLoader.collate_fn = collate_fn_custom
-
+from torch_geometric.data import Data
+import pdb
 
 # Monkey patch the subgraph method on the Data class to not relabel nodes
 def subgraph_custom(self, subset: Tensor) -> 'Data':
@@ -60,14 +42,12 @@ def subgraph_custom(self, subset: Tensor) -> 'Data':
 
         return data
 
-
 Data.subgraph = subgraph_custom
 
 
 class Batch:
     def __init__(self, sub_graph: torch_geometric.data.Data):
         self.sub_graph = sub_graph
-        # self.indices = indices
 
     def to(self, device):
         self.sub_graph = self.sub_graph.to(device)

@@ -5,7 +5,7 @@ num_epochs: 50_000
 
 
 model_init: 'random'
-lr: 0.1
+lr: 1.0
 early_stop_patience: 500
 rank_range:
   min: 1

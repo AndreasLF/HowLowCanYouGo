@@ -27,12 +27,23 @@ def run_experiment(config: Config,
     cfg = Config("./configs/config.yaml")
     raw_path = cfg.get("data", "raw_path")
 
-    dataset = get_data_from_torch_geometric("Planetoid", "Cora", raw_path)
+    dat = config.get("dataset_ref")
+    if not dat:
+        raise ValueError("Please specify a dataset_ref in the experiment config file")
+    if "pytorch-geometric" in dat.lower(): 
+        src_split = dat.split("/")
+        dataset = get_data_from_torch_geometric(src_split[1], src_split[2], raw_path)
+        data = dataset[0]
+    elif "snapdataset" in dat.lower():
+        src_split = dat.split("/")
+        dataset = get_data_from_torch_geometric(src_split[0], src_split[1], raw_path)
+        data = dataset[0]
     # Get first graph in dataset
     data = dataset[0]
 
-    # dataloader = CustomGraphDataLoader(data, batch_size=data.num_nodes)
-    dataloader = CustomGraphDataLoader(data, batch_size=int(.25*data.num_nodes))
+    # Either use the batch size from the config or set it to the number of nodes i.e. the whole graph
+    batch_size = config.get('batch_size') or int(data.num_nodes)
+    dataloader = CustomGraphDataLoader(data, batch_size=batch_size)
     
     model_types = config.get('model_types')
     loss_types = config.get('loss_types')

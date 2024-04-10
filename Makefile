@@ -42,13 +42,16 @@ DEVICE = cuda
 RANK = 48
 LR = 1.0
 EPOCHS = 10_000
-DATASET = Pubmed
+DATASET = Planetoid/Pubmed
+BATCH_SIZE_PERCENT = 1.0 # 1.0 means full batch
+
 TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
 		--rank $(RANK) \
 		--lr $(LR) --num-epochs $(EPOCHS) \
 		--model-init random \
-		--device $(DEVICE) \
-		--data $(DATASET)
+		--dataset $(DATASET) \
+		--batchsize-percent $(BATCH_SIZE_PERCENT) \
+		--device $(DEVICE)
 
 train-ll2:
 	$(TRAIN_RANDOM) \

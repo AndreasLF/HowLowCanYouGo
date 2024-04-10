@@ -30,7 +30,8 @@ if __name__ == '__main__':
     parser.add_argument('--save-ckpt', type=str, default='results/model.pt', help='path to save model checkpoint (ckpt) to (default: %(default)s)')
     parser.add_argument('--data', type=str, default='Cora', choices=['Cora', 'Citeseer', 'Facebook', 'Pubmed'], help='dataset to train on (default: %(default)s)')
     parser.add_argument('--model-init', type=str, default='random', choices=['random', 'load', 'pre-svd', 'post-svd'], help='how to initialize the model (default: %(default)s)')
-
+    parser.add_argument('--dataset', type=str, default='Planetoid/Cora', help='dataset to train on (default: %(default)s)')
+    parser.add_argument('--batchsize-percentage', type=float, default=1.0, help='percentage of the dataset to use as batch size (default: %(default)s)')
 
     args = parser.parse_args()
     print('# Options')
@@ -45,13 +46,14 @@ if __name__ == '__main__':
     cfg = Config("./configs/config.yaml")
     raw_path = cfg.get("data", "raw_path")
 
-    dataset = get_data_from_torch_geometric("Planetoid", args.data, raw_path)
+
+    dataset_split = args.dataset.split("/") # e.g. Planetoid/Cora
+    dataset = get_data_from_torch_geometric(dataset_split[0], dataset_split[1], raw_path)
     # Get first graph in dataset
     data = dataset[0]
 
-    # dataloader = CustomGraphDataLoader(data, batch_size=int(.25*data.num_nodes))
-    # pdb.set_trace()
-    dataloader = CustomGraphDataLoader(data, batch_size=int(data.num_nodes))
+    dataloader = CustomGraphDataLoader(data, batch_size=int(args.batchsize_percentage*data.num_nodes))
+
 
     model_init = args.model_init
 
