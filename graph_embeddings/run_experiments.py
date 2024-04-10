@@ -129,6 +129,12 @@ def main():
 
         exp_config = Config(config_path)
 
+        # check if loss and model are specified
+        if args.loss:
+            exp_config.set('loss_types', [args.loss])
+        if args.model:
+            exp_config.set('model_types', [args.model])
+
         print("="*50)
         # print the whole config
         print(exp_config)
