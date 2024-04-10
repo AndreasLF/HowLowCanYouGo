@@ -37,9 +37,9 @@ if [ "$#" -eq 3 ]; then
     MODEL_TYPE="$3"
 
     # Assign the loss and model types to variables
-    RUN_EXPERIMENTS_ARGS="--device cuda --experiment ${EXPERIMENT_NAME} --loss ${LOSS_TYPE} --model ${MODEL_TYPE}"
+    RUN_EXPERIMENTS_ARGS="--device cuda --experiment ${EXPERIMENT_NAME} --loss ${LOSS_TYPE} --model ${MODEL_TYPE} --loglevel 3"
 else 
-    RUN_EXPERIMENTS_ARGS="--device cuda --experiment ${EXPERIMENT_NAME}"
+    RUN_EXPERIMENTS_ARGS="--device cuda --experiment ${EXPERIMENT_NAME} --loglevel 3"
 fi
 
 # Replace placeholders in the template with actual environment variable values and the experiment name
