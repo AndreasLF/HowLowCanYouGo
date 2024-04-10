@@ -42,13 +42,11 @@ class Trainer:
         self.dataset_path = dataset_path
         self.exp_id = exp_id
 
-    def calc_frob_error_norm(self, A_hat, A):
+    def calc_frob_error_norm(self, logits, A):
         """Compute the Frobenius error norm between the logits and the adjacency matrix."""
-        A_hat[A_hat >= 0] = 1.
-        A_hat[A_hat < 0] = 0.
-        
-        frob_err = torch.linalg.norm(A_hat - A) / torch.linalg.norm(A)
-
+        logits[logits >= self.thresh] = 1.
+        logits[logits < self.thresh] = 0.
+        frob_err = torch.linalg.norm(logits - A) / torch.linalg.norm(A)
         return frob_err
 
 
@@ -170,8 +168,10 @@ class Trainer:
                     A_hat = model.reconstruct(batch.indices) 
                     if loss_fn_name == 'PoissonLoss':
                         A = batch.adj
+                        self.thresh = torch.log(torch.tensor(.5))
                     else:
                         A = batch.adj_s 
+                        self.thresh = 0
                     loss = loss_fn(A_hat, A)
                     loss.backward()
                     optimizer.step()
@@ -179,7 +179,7 @@ class Trainer:
 
                 epoch_loss = sum(losses) / len(losses)
 
-                if epoch % 100 == 0: # ! only check every {x}'th epoch
+                if epoch % 10 == 0: # ! only check every {x}'th epoch
                     last_frob_epoch = epoch
                     # Compute Frobenius error for diagnostics
                     with torch.no_grad():  # Ensure no gradients are computed in this block
