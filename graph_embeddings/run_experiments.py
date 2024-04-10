@@ -59,7 +59,7 @@ def run_experiment(config: Config,
             load_ckpt = config.get('load_ckpt')
             model_init = config.get('model_init') or 'random'
             
-            loggers = {0: [], 1: [JSONLogger], 2: [JSONLogger, wandb]}[loglevel]
+            loggers = {0: [], 1: [JSONLogger], 2: [JSONLogger, wandb], 3: [wandb]}[loglevel]
             
             # Initialize the trainer
             trainer = Trainer(dataloader=dataloader, model_class=model_class, 
@@ -82,7 +82,7 @@ def main():
     parser.add_argument('--device', type=str, default='cpu')
     parser.add_argument('--all', action='store_true', help='Run all experiments')
     parser.add_argument('--experiment', type=str, default=None, help='Run a specific experiment')
-    parser.add_argument('--loglevel', default="2", choices=["0","1","2"], help='Log level [0: nothing, 1: logs to JSON, 2: logs to JSON and WANDB]')
+    parser.add_argument('--loglevel', default="2", choices=["0","1","2"], help='Log level [0: nothing, 1: logs to JSON, 2: logs to JSON and WANDB, 3: logs to WANDB only]')
     parser.add_argument('--loss', type=str, default=None, help='Loss function to use (logistic, hinge, poisson). Default uses config file, only pass this argument to overwrite it.')
     parser.add_argument('--model', type=str, default=None, help='Model to use (PCA, L2). Default uses config file, only pass this argument to overwrite it.')
 
