@@ -45,10 +45,6 @@ class Trainer:
         clipped_logits = torch.clip(logits, min=0, max=1)
         frob_err = torch.linalg.norm(clipped_logits - adj) / torch.linalg.norm(adj)
 
-        # pred1 = logits >= 0.
-        # pred2 = adj == 1
-        # frob_err = (7_333_264 - torch.sum(pred1 == pred2)) / 7_333_264
-        # pdb.set_trace()
         return frob_err
 
 
@@ -167,7 +163,7 @@ class Trainer:
                     # optimizer.zero_grad(set_to_none=True)
                     optimizer.zero_grad()
                     A_hat = model.reconstruct(batch.indices) 
-                    if loss_fn_name in ['PoissonLoss', 'SimpleLoss']:
+                    if loss_fn_name == 'PoissonLoss':
                         A = batch.adj
                     else:
                         A = batch.adj_s 
@@ -185,7 +181,7 @@ class Trainer:
                         A_hat = model.reconstruct()
                         A_hat[A_hat >= 0] = 1.
                         A_hat[A_hat < 0] = 0.
-                        frob_error_norm = self.calc_frob_error_norm(A_hat, A)
+                        frob_error_norm = self.calc_frob_error_norm(A_hat, batch.adj)
                         # pdb.set_trace()
 
                     # Log metrics to all loggers
