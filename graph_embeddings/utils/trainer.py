@@ -42,11 +42,7 @@ class Trainer:
         self.dataset_path = dataset_path
         self.exp_id = exp_id
 
-<<<<<<< HEAD
     def calc_frob_error_norm(self, A_hat, A):
-=======
-    def calc_frob_error_norm(self, logits, adj):
->>>>>>> e04a8e9d392560c5104075069b14ebb4cd969b08
         """Compute the Frobenius error norm between the logits and the adjacency matrix."""
         A_hat[A_hat >= 0] = 1.
         A_hat[A_hat < 0] = 0.
