@@ -40,10 +40,12 @@ class Trainer:
         self.project_name = project_name
         self.dataset_path = dataset_path
 
-    def calc_frob_error_norm(self, logits, adj, ):
+    def calc_frob_error_norm(self, A_hat, A):
         """Compute the Frobenius error norm between the logits and the adjacency matrix."""
-        clipped_logits = torch.clip(logits, min=0, max=1)
-        frob_err = torch.linalg.norm(clipped_logits - adj) / torch.linalg.norm(adj)
+        A_hat[A_hat >= 0] = 1.
+        A_hat[A_hat < 0] = 0.
+        
+        frob_err = torch.linalg.norm(A_hat - A) / torch.linalg.norm(A)
 
         return frob_err
 
@@ -179,8 +181,6 @@ class Trainer:
                     # Compute Frobenius error for diagnostics
                     with torch.no_grad():  # Ensure no gradients are computed in this block
                         A_hat = model.reconstruct()
-                        A_hat[A_hat >= 0] = 1.
-                        A_hat[A_hat < 0] = 0.
                         frob_error_norm = self.calc_frob_error_norm(A_hat, batch.adj)
                         # pdb.set_trace()
 
