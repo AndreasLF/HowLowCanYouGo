@@ -14,6 +14,8 @@ from graph_embeddings.data.make_datasets import get_data_from_torch_geometric
 
 from utils.config import Config
 
+import uuid
+
 def run_experiment(config: Config, 
                    device: str = 'cpu', 
                    results_folder: str = 'results', 
@@ -22,6 +24,9 @@ def run_experiment(config: Config,
     # Load and prepare your data
     dataset_path = config.get("dataset_path")
     # adj = load_adj(dataset_path).to(config.get('device'))
+
+
+    unique_id = uuid.uuid4()
 
 
     cfg = Config("./configs/config.yaml")
@@ -66,7 +71,7 @@ def run_experiment(config: Config,
                               loss_fn=loss_fn, model_init=model_init,
                               threshold=1e-10, num_epochs=config.get("num_epochs"),
                               device=device, loggers=loggers, dataset_path=dataset_path, 
-                              save_ckpt=results_folder, load_ckpt=load_ckpt)
+                              save_ckpt=results_folder, load_ckpt=load_ckpt, exp_id=unique_id)
             
             # If rank_range is specified, search for the optimal rank
             rank_range = config.get('rank_range')
