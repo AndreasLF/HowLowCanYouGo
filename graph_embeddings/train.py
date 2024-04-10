@@ -28,10 +28,11 @@ if __name__ == '__main__':
     parser.add_argument('--device', type=str, default='cpu', choices=['cpu', 'cuda', 'mps'], help='torch device (default: %(default)s)')
     parser.add_argument('--load-ckpt', type=str, default='none', help='path to load model checkpoint (ckpt) from (default: %(default)s)')
     parser.add_argument('--save-ckpt', type=str, default='results/model.pt', help='path to save model checkpoint (ckpt) to (default: %(default)s)')
-    parser.add_argument('--data', type=str, default='Cora', choices=['Cora', 'Citeseer', 'Facebook', 'Pubmed'], help='dataset to train on (default: %(default)s)')
     parser.add_argument('--model-init', type=str, default='random', choices=['random', 'load', 'pre-svd', 'post-svd'], help='how to initialize the model (default: %(default)s)')
     parser.add_argument('--dataset', type=str, default='Planetoid/Cora', help='dataset to train on (default: %(default)s)')
     parser.add_argument('--batchsize-percentage', type=float, default=1.0, help='percentage of the dataset to use as batch size (default: %(default)s)')
+
+    # torch.set_default_tensor_type(torch.cuda.DoubleTensor)
 
     args = parser.parse_args()
     print('# Options')
@@ -70,4 +71,8 @@ if __name__ == '__main__':
     
     # Train one model model
     model = trainer.init_model(args.rank)
-    trainer.train(args.rank, model=model,lr=args.lr, save_path=args.save_ckpt)
+    trainer.train(args.rank, 
+                  model=model,
+                  lr=args.lr, 
+                #   early_stop_patience=100,
+                  save_path=args.save_ckpt)

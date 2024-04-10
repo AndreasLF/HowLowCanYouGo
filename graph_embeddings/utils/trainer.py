@@ -164,8 +164,8 @@ class Trainer:
                 for b_idx, batch in enumerate(self.dataloader):
                     batch.to(self.device)
                     # Forward pass
-                    optimizer.zero_grad(set_to_none=True)
-                    # optimizer.zero_grad()
+                    # optimizer.zero_grad(set_to_none=True)
+                    optimizer.zero_grad()
                     A_hat = model.reconstruct(batch.indices) 
                     if loss_fn_name in ['PoissonLoss', 'SimpleLoss']:
                         A = batch.adj
@@ -185,7 +185,8 @@ class Trainer:
                         A_hat = model.reconstruct()
                         A_hat[A_hat >= 0] = 1.
                         A_hat[A_hat < 0] = 0.
-                        frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
+                        frob_error_norm = self.calc_frob_error_norm(A_hat, A)
+                        # pdb.set_trace()
 
                     # Log metrics to all loggers
                     metrics = {'epoch': epoch, 'loss': epoch_loss, 'frob_error_norm': frob_error_norm.item()}
@@ -193,7 +194,7 @@ class Trainer:
                         logger.log(metrics)
 
                 # update progress bar
-                pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_frob_epoch}={frob_error_norm or .0:.4f}")
+                pbar.set_description(f"{model_class_name} {loss_fn_name} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_frob_epoch}={frob_error_norm or .0:.4f}")
                 # Break if Froebenius error is less than threshold
                 if frob_error_norm <= self.threshold:
                     pbar.close()
