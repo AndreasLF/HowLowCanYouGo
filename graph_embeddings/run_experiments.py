@@ -26,9 +26,6 @@ def run_experiment(config: Config,
     # adj = load_adj(dataset_path).to(config.get('device'))
 
 
-    unique_id = uuid.uuid4()
-
-
     cfg = Config("./configs/config.yaml")
     raw_path = cfg.get("data", "raw_path")
 
@@ -56,6 +53,9 @@ def run_experiment(config: Config,
     for model_type in model_types:
         for loss_type in loss_types:
             print(f"# Training {model_type} model with {loss_type}...")
+
+            unique_id = uuid.uuid4()
+
 
             # Determine the model and loss function based on config
             model_class = {'PCA': PCAModel, 'L2': L2Model}[model_type]
