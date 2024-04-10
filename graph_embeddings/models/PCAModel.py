@@ -50,13 +50,20 @@ class PCAModel(nn.Module):
         Y = V @ S_inv_sqrt
         return cls(X,Y)
 
-    def reconstruct(self):
+    def reconstruct(self,
+                    node_indices = None):
+        if node_indices is not None:
+            X = self.X[node_indices]
+            Y = self.Y[node_indices]
+        else:
+            X = self.X
+            Y = self.Y
         if self.S is not None:
             # _S = softplus(_S) for nonneg
             _S = torch.diag(F.softplus(self.S))
-            A_hat = self.X @ _S @ self.Y.t()
+            A_hat = X @ _S @ Y.t()
         else:
-            A_hat = self.X @ self.Y.t()
+            A_hat = X @ Y.t()
         return A_hat
 
     def forward(self):

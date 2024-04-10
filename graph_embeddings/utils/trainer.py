@@ -40,16 +40,25 @@ class Trainer:
         self.project_name = project_name
         self.dataset_path = dataset_path
 
-    def calc_frob_error_norm(self, logits, adj):
+    def calc_frob_error_norm(self, logits, adj, ):
         """Compute the Frobenius error norm between the logits and the adjacency matrix."""
         clipped_logits = torch.clip(logits, min=0, max=1)
-        return torch.linalg.norm(clipped_logits - adj) / torch.linalg.norm(adj)
+        frob_err = torch.linalg.norm(clipped_logits - adj) / torch.linalg.norm(adj)
+
+        # pred1 = logits >= 0.
+        # pred2 = adj == 1
+        # frob_err = (7_333_264 - torch.sum(pred1 == pred2)) / 7_333_264
+        # pdb.set_trace()
+        return frob_err
+
 
     def init_model(self,
                    rank: int|None = None):
             if self.model_init == 'random':
                 assert rank is not None
-                model = self.model_class.init_random(self.dataloader.num_total_nodes, self.dataloader.num_total_nodes, rank).to(self.device)
+                model = self.model_class.init_random(self.dataloader.num_total_nodes, 
+                                                     self.dataloader.num_total_nodes, 
+                                                     rank).to(self.device)
             elif self.model_init == 'load':
                 model_params = torch.load(self.load_ckpt,map_location=self.device)
                 model = self.model_class(*model_params)
@@ -155,9 +164,14 @@ class Trainer:
                 for b_idx, batch in enumerate(self.dataloader):
                     batch.to(self.device)
                     # Forward pass
+                    # optimizer.zero_grad(set_to_none=True)
                     optimizer.zero_grad()
                     A_hat = model.reconstruct(batch.indices) 
-                    loss = loss_fn(A_hat, batch.adj_s)
+                    if loss_fn_name in ['PoissonLoss', 'SimpleLoss']:
+                        A = batch.adj
+                    else:
+                        A = batch.adj_s 
+                    loss = loss_fn(A_hat, A)
                     loss.backward()
                     optimizer.step()
                     losses.append(loss.item())
@@ -169,7 +183,10 @@ class Trainer:
                     # Compute Frobenius error for diagnostics
                     with torch.no_grad():  # Ensure no gradients are computed in this block
                         A_hat = model.reconstruct()
-                        frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
+                        A_hat[A_hat >= 0] = 1.
+                        A_hat[A_hat < 0] = 0.
+                        frob_error_norm = self.calc_frob_error_norm(A_hat, A)
+                        # pdb.set_trace()
 
                     # Log metrics to all loggers
                     metrics = {'epoch': epoch, 'loss': epoch_loss, 'frob_error_norm': frob_error_norm.item()}
@@ -177,7 +194,7 @@ class Trainer:
                         logger.log(metrics)
 
                 # update progress bar
-                pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_frob_epoch}={frob_error_norm or .0:.4f}")
+                pbar.set_description(f"{model_class_name} {loss_fn_name} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_frob_epoch}={frob_error_norm or .0:.4f}")
                 # Break if Froebenius error is less than threshold
                 if frob_error_norm <= self.threshold:
                     pbar.close()

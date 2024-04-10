@@ -71,7 +71,7 @@ The experiment configuration file is a yaml file that defines the experiment. An
 ```yaml
 dataset_path: './data/adj_matrices/Cora.pt' # Path to the dataset
 model_types: ['L2', 'PCA']
-loss_types: ['logistic', 'hinge'] # Which models to run
+loss_types: ['poisson', 'hinge', 'logistic'] # Which models to run
 num_epochs: 50_000 # Number of epochs to run
 model_init: 'random' # Model initialization, random or svd
 lr: 0.1 # Learning rate
