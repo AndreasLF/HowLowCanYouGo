@@ -39,11 +39,12 @@ run_experiments:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/run_experiments.py $(ARGS)
 
 DEVICE = cuda
-RANK = 8
+RANK = 48
 LR = 1.0
 EPOCHS = 10_000
-DATASET = Planetoid/Cora
+DATASET = Planetoid/Pubmed
 BATCH_SIZE_PERCENT = 1.0 # 1.0 means full batch
+
 TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
 		--rank $(RANK) \
 		--lr $(LR) --num-epochs $(EPOCHS) \
@@ -70,6 +71,10 @@ train-hpca:
 		--model-type PCA --loss-type hinge \
 		--save-ckpt results/hpca.pt
 
+train-simple-l2:
+	$(TRAIN_RANDOM) \
+		--model-type L2 --loss-type simple \
+		--save-ckpt results/pl2.pt
 train-pl2:
 	$(TRAIN_RANDOM) \
 		--model-type L2 --loss-type poisson \
