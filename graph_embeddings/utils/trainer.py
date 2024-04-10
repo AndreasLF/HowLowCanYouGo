@@ -24,7 +24,8 @@ class Trainer:
                  device='cpu', 
                  loggers=[JSONLogger], 
                  project_name='GraphEmbeddings',
-                 dataset_path='not specified'):
+                 dataset_path='not specified',
+                 exp_id='not specified'):
         """Initialize the trainer."""   
         
         self.dataloader = dataloader
@@ -39,8 +40,13 @@ class Trainer:
         self.loggers = loggers
         self.project_name = project_name
         self.dataset_path = dataset_path
+        self.exp_id = exp_id
 
+<<<<<<< HEAD
     def calc_frob_error_norm(self, A_hat, A):
+=======
+    def calc_frob_error_norm(self, logits, adj):
+>>>>>>> e04a8e9d392560c5104075069b14ebb4cd969b08
         """Compute the Frobenius error norm between the logits and the adjacency matrix."""
         A_hat[A_hat >= 0] = 1.
         A_hat[A_hat < 0] = 0.
@@ -113,7 +119,8 @@ class Trainer:
                                 'model_class': model_class_name,
                                 'dataset_path': dataset_path,
                                 'early_stop_patience': early_stop_patience,
-                                'batch_size': batch_size
+                                'batch_size': batch_size,
+                                'exp_id': self.exp_id,
                                 })
 
 
