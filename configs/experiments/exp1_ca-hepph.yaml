@@ -1,7 +1,7 @@
 dataset_path: './data/adj_matrices/ca-HepPh.pt'
 dataset_ref: 'SNAPDataset/ca-HepPh'
 model_types: ['L2', 'PCA']
-loss_types: ['logistic', 'hinge']
+loss_types: ['poisson', 'hinge', 'logistic']
 num_epochs: 50_000
 
 

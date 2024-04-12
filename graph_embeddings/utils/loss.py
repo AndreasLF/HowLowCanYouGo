@@ -31,13 +31,13 @@ class HingeLoss(BaseLoss):
 class PoissonLoss(BaseLoss):
     def __call__(self, 
                  A_hat: torch.Tensor, 
-                 adj: torch.Tensor
+                 A: torch.Tensor
                  ):
         """
         A_hat: torch.Tensor - reconstruction of adj. matrix.
-        adj: torch.Tensor - adj. matrix.
+        A: torch.Tensor - adj. matrix.
         """
-        p1 = adj*A_hat
+        p1 = A*A_hat
         p2 = torch.exp(A_hat)
         p_loss = (p2 - p1).sum()
         return p_loss
