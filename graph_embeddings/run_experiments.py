@@ -20,7 +20,7 @@ def run_experiment(config: Config,
                    device: str = 'cpu', 
                    results_folder: str = 'results', 
                    experiment_name: str = 'experiment', 
-                   loglevel=2):
+                   loglevel: int = 2):
     # Load and prepare your data
     dataset_path = config.get("dataset_path")
     # adj = load_adj(dataset_path).to(config.get('device'))
@@ -67,12 +67,13 @@ def run_experiment(config: Config,
             loggers = {0: [], 1: [JSONLogger], 2: [JSONLogger, wandb], 3: [wandb]}[loglevel]
             
             # Initialize the trainer
+
+            recons_check = config.get("recons_check") or "frob"
             trainer = Trainer(dataloader=dataloader, model_class=model_class, 
                               loss_fn=loss_fn, model_init=model_init,
                               threshold=0., num_epochs=config.get("num_epochs"),
                               device=device, loggers=loggers, dataset_path=dataset_path, 
-                              save_ckpt=results_folder, load_ckpt=load_ckpt, exp_id=unique_id)
-            
+                              save_ckpt=results_folder, load_ckpt=load_ckpt, reconstruction_check=recons_check, exp_id=unique_id)
             # If rank_range is specified, search for the optimal rank
             rank_range = config.get('rank_range')
             if rank_range:
@@ -87,7 +88,8 @@ def main():
     parser.add_argument('--device', type=str, default='cpu')
     parser.add_argument('--all', action='store_true', help='Run all experiments')
     parser.add_argument('--experiment', type=str, default=None, help='Run a specific experiment')
-    parser.add_argument('--loglevel', default="2", choices=["0","1","2","3"], help='Log level [0: nothing, 1: logs to JSON, 2: logs to JSON and WANDB, 3: logs to WANDB only]')
+    parser.add_argument('--recons-check', default="frob", choices=["frob","neigh"], help='Method to check for full reconstruction [frob: frobenius error, neigh: nearest neighbours in embedding space]')
+    parser.add_argument('--loglevel', default="3", choices=["0","1","2","3"], help='Log level [0: nothing, 1: logs to JSON, 2: logs to JSON and WANDB, 3: logs to WANDB only]')
     parser.add_argument('--loss', type=str, default=None, help='Loss function to use (logistic, hinge, poisson). Default uses config file, only pass this argument to overwrite it.')
     parser.add_argument('--model', type=str, default=None, help='Model to use (PCA, L2). Default uses config file, only pass this argument to overwrite it.')
 

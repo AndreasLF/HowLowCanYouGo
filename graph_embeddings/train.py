@@ -29,6 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('--load-ckpt', type=str, default='none', help='path to load model checkpoint (ckpt) from (default: %(default)s)')
     parser.add_argument('--save-ckpt', type=str, default='results/model.pt', help='path to save model checkpoint (ckpt) to (default: %(default)s)')
     parser.add_argument('--model-init', type=str, default='random', choices=['random', 'load', 'pre-svd', 'post-svd'], help='how to initialize the model (default: %(default)s)')
+    parser.add_argument('--recons-check', type=str, default='frob', choices=['frob', 'neigh', 'both'], help='how to check reconstruction quality (default: %(default)s)')
     parser.add_argument('--dataset', type=str, default='Planetoid/Cora', help='dataset to train on (default: %(default)s)')
     parser.add_argument('--batchsize-percentage', type=float, default=1.0, help='percentage of the dataset to use as batch size (default: %(default)s)')
 
@@ -67,7 +68,7 @@ if __name__ == '__main__':
     trainer = Trainer(dataloader=dataloader, model_class=model, loss_fn=loss_fn, model_init=model_init,
                       threshold=1e-10, num_epochs=args.num_epochs, save_ckpt=args.save_ckpt,
                       load_ckpt=args.load_ckpt, device=args.device, 
-                      loggers=[])#, wandb])
+                      loggers=[], reconstruction_check=args.recons_check)
     
     # Train one model model
     model = trainer.init_model(args.rank)

@@ -11,6 +11,8 @@ from graph_embeddings.models.PCAModel import PCAModel
 from graph_embeddings.utils.load_data import load_adj
 from graph_embeddings.utils.logger import JSONLogger
 
+from graph_embeddings.utils.nearest_neighbours_reconstruction_check import get_edge_index_embeddings, compare_edge_indices
+
 class Trainer:
     def __init__(self, 
                  dataloader, 
@@ -25,6 +27,7 @@ class Trainer:
                  loggers=[JSONLogger], 
                  project_name='GraphEmbeddings',
                  dataset_path='not specified',
+                 reconstruction_check="frob",
                  exp_id='not specified'):
         """Initialize the trainer."""   
         
@@ -41,6 +44,11 @@ class Trainer:
         self.project_name = project_name
         self.dataset_path = dataset_path
         self.exp_id = exp_id
+
+        assert reconstruction_check in ["frob", "neigh", "both"]
+        self.reconstruction_check = reconstruction_check
+
+
 
     def calc_frob_error_norm(self, logits, A):
         """Compute the Frobenius error norm between the logits and the adjacency matrix."""
@@ -90,6 +98,10 @@ class Trainer:
         dataset_path = self.dataset_path
         full_reconstruction = False
         batch_size = self.dataloader.batch_size
+        last_recons_check_epoch = None
+        perc_edges_reconstructed = None
+        frob_error_norm = None
+        is_fully_reconstructed = False
 
         # ----------- Initialize logging -----------
         # get loss_fn function name
@@ -106,12 +118,29 @@ class Trainer:
                                 'loss_fn': loss_fn_name, 
                                 'model_class': model_class_name,
                                 'dataset_path': dataset_path,
-                                'early_stop_patience': adjust_lr_patience, # TODO fix in logging? i.e. early_stop_patience => adjust_lr_patience
+                                'adjust_lr_patience': adjust_lr_patience,
                                 'batch_size': batch_size,
                                 'exp_id': self.exp_id,
-                                })            
-        self.adj = self.dataloader.full_adj.to(self.device) # ! used for small graphs for FROB
+                                'reconstruction_check': self.reconstruction_check,
+                                })         
 
+        """
+        # ----------- Shift adjacency matrix -----------
+        # shift adj matrix to -1's and +1's
+        if loss_fn_name == 'PoissonLoss':
+            print("using adjacency")
+            A = self.adj # adjacency matrix used in loss function
+        else:
+            print("using shifted adjacency")
+            A = self.adj*2 - 1 # shifted adjacency matrix used in loss function
+        # # ----------- Shift adjacency matrix -----------
+        # # shift adj matrix to -1's and +1's
+        # adj_s = self.adj*2 - 1
+        """
+            
+        if self.reconstruction_check == "frob" or self.reconstruction_check == "both":
+            self.adj = self.dataloader.full_adj.to(self.device) # ! used for small graphs for FROB
+   
         # ----------- Optimizer ----------- 
         optimizer = optim.Adam(model.parameters(), lr=lr)
 
@@ -144,22 +173,61 @@ class Trainer:
                     losses.append(loss.item())
                 epoch_loss = sum(losses) / len(losses)
 
-                if epoch % eval_recon_freq == 0: # ! only check every {x}'th epoch
-                    last_frob_epoch = epoch
-                    # Compute Frobenius error for diagnostics
-                    with torch.no_grad():  # Ensure no gradients are computed in this block
-                        A_hat = model.reconstruct() # full reconstruction
-                        frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj) # check full reconstruction
 
-                    # Log metrics to all loggers
-                    metrics = {'epoch': epoch, 'loss': epoch_loss, 'frob_error_norm': frob_error_norm.item()}
-                    for logger in self.loggers:
-                        logger.log(metrics)
+                if self.reconstruction_check == "frob":
+                    if epoch % 100 == 0 and epoch != 0: # ! only check every {x}'th epoch
+                        last_recons_check_epoch = epoch
+                        # Compute Frobenius error for diagnostics
+                        with torch.no_grad():  # Ensure no gradients are computed in this block
+                            A_hat = model.reconstruct()
+                            frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
 
-                # update progress bar
-                pbar.set_description(f"{model_class_name} {loss_fn_name} lr={scheduler.get_last_lr()} rank={rank} loss={epoch_loss:.1f} frob_err[@{last_frob_epoch}]={frob_error_norm or .0:.4f}")
-                # Break if Froebenius error is less than threshold
-                if frob_error_norm <= self.threshold:
+                        # Log metrics to all loggers
+                        metrics = {'epoch': epoch, 'loss': epoch_loss, 'frob_error_norm': frob_error_norm.item()}
+                        for logger in self.loggers:
+                            logger.log(metrics)
+
+                        is_fully_reconstructed = frob_error_norm <= self.threshold
+
+                    # update progress bar
+                    pbar.set_description(f"{model_class_name} {loss_fn_name} lr={scheduler.get_last_lr()} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_recons_check_epoch}={frob_error_norm or .0:.4f}")
+                        
+                elif self.reconstruction_check == "neigh":
+                    if epoch % 100 == 0 and epoch != 0: # ! only check every {x}'th epoch
+                        print("TEST1")
+                        last_recons_check_epoch = epoch
+
+                        # Compute Frobenius error for diagnostics
+                        with torch.no_grad():
+                            edge_index_from_neighbors = get_edge_index_embeddings(model.X, model.Y, model.beta)
+                            common_edges = compare_edge_indices(self.dataloader.data.edge_index, edge_index_from_neighbors)
+                            perc_edges_reconstructed = len(common_edges) / self.dataloader.data.edge_index.size(1) * 100
+                        
+                        is_fully_reconstructed = len(common_edges) == self.dataloader.data.num_edges
+
+                    # update progress bar
+                    pbar.set_description(f"{model_class_name} {loss_fn_name} lr={scheduler.get_last_lr()} rank={rank}, loss={epoch_loss:.1f} edges_reconstructed@{last_recons_check_epoch}={perc_edges_reconstructed or .0:.2f}%")
+                        
+                elif self.reconstruction_check == "both":
+                    if epoch % 100 == 0 and epoch != 0:
+                        last_recons_check_epoch = epoch
+
+                        # Compute Frobenius error for diagnostics
+                        with torch.no_grad():
+                            A_hat = model.reconstruct()
+                            frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
+                            edge_index_from_neighbors = get_edge_index_embeddings(model.X, model.Y, model.beta)
+                            common_edges = compare_edge_indices(self.dataloader.data.edge_index, edge_index_from_neighbors)
+                            perc_edges_reconstructed = len(common_edges) / self.dataloader.data.edge_index.size(1) * 100
+                        
+                        is_fully_reconstructed = frob_error_norm <= self.threshold and len(common_edges) == self.dataloader.data.num_edges
+
+                    # update progress bar
+                    pbar.set_description(f"{model_class_name} {loss_fn_name} lr={scheduler.get_last_lr()} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_recons_check_epoch}={frob_error_norm or .0:.4f}, edges_reconstructed@{last_recons_check_epoch}={perc_edges_reconstructed or .0:.2f}%")
+
+                
+                # Break if fully reconstructed
+                if is_fully_reconstructed:
                     pbar.close()
                     for logger in self.loggers:
                         logger.config.update({'full_reconstruction': True})
@@ -201,7 +269,7 @@ class Trainer:
             logger.finish()
 
         # return final_outputs
-        return model
+        return is_fully_reconstructed
 
     def _save_model(self, model, path):
         """Save the model to a file."""
@@ -261,7 +329,7 @@ class Trainer:
         save_path = None # ! just ignore initial model
         model = self.init_model(rank=max_rank)
         if self.model_init != 'load':
-            model = self.train(max_rank, model=model, lr=lr, adjust_lr_patience=early_stop_patience, save_path=save_path)
+            self.train(max_rank, model=model, lr=lr, adjust_lr_patience=early_stop_patience, save_path=save_path)
         
         def compute_svd_target(model):
             """
@@ -289,18 +357,14 @@ class Trainer:
             model = model.__class__(X@V, Y@V).to(self.device) # create new model instance with the PCA projected embedding matrices
 
             # 3. Train new model
-            model = self.train(current_rank, 
+            is_fully_reconstructed = self.train(current_rank, 
                                model=model, 
                                lr=lr, 
                                adjust_lr_patience=early_stop_patience, 
                                save_path=save_path)
 
-            # Calculate the Frobenius reconstruction measure
-            logits = model.reconstruct()
-            frob_error = self.calc_frob_error_norm(logits, self.adj)
-
             # Check if the reconstruction is within the threshold
-            if frob_error <= self.threshold:
+            if is_fully_reconstructed:
                 print(f'Full reconstruction at rank {current_rank}\n')
                 optimal_rank = current_rank  # Update the optimal rank if reconstruction is within the threshold
                 upper_bound = current_rank - 1  # Try to find a smaller rank

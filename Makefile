@@ -39,11 +39,12 @@ run_experiments:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/run_experiments.py $(ARGS)
 
 DEVICE = cuda
-RANK = 48
+RANK = 50
 LR = 0.1
 EPOCHS = 10_000
 DATASET = Planetoid/Cora
 BATCH_SIZE_PERCENTAGE = 1.0 # batch = full adj
+RECONS_CHECK = both
 
 TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
 		--rank $(RANK) \
@@ -51,6 +52,7 @@ TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
 		--model-init random \
 		--dataset $(DATASET) \
 		--batchsize-percentage $(BATCH_SIZE_PERCENTAGE) \
+		--recons-check $(RECONS_CHECK) \
 		--device $(DEVICE)
 
 train-ll2:
@@ -86,3 +88,11 @@ train-ppca:
 
 get_stats:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/make_stats.py --print-latex
+
+profile:
+	$(PYTHON_INTERPRETER) -m cProfile -o profile.prof $(PROJECT_NAME)/train.py \
+	--model-type L2 --loss-type logistic \
+	--rank $(RANK) \
+	--lr $(LR) --num-epochs $(EPOCHS) \
+	--model-init random \
+	--device $(DEVICE)
