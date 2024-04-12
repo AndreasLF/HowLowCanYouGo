@@ -45,12 +45,12 @@ class Trainer:
         self.dataset_path = dataset_path
         self.exp_id = exp_id
 
-        assert reconstruction_check in ["frob", "neigh"]
+        assert reconstruction_check in ["frob", "neigh", "both"]
         self.reconstruction_check = reconstruction_check
 
 
 
-    def calc_frob_error_norm(self, logits, adj):
+    def calc_frob_error_norm(self, logits, A):
         """Compute the Frobenius error norm between the logits and the adjacency matrix."""
         logits[logits >= self.thresh] = 1.
         logits[logits < self.thresh] = 0.
@@ -138,7 +138,7 @@ class Trainer:
         # adj_s = self.adj*2 - 1
         """
             
-        if self.reconstruction_check == "frob":
+        if self.reconstruction_check == "frob" or self.reconstruction_check == "both":
             self.adj = self.dataloader.full_adj.to(self.device) # ! used for small graphs for FROB
    
         # ----------- Optimizer ----------- 
@@ -208,6 +208,22 @@ class Trainer:
                     # update progress bar
                     pbar.set_description(f"{model_class_name} {loss_fn_name} lr={scheduler.get_last_lr()} rank={rank}, loss={epoch_loss:.1f} edges_reconstructed@{last_recons_check_epoch}={perc_edges_reconstructed or .0:.2f}%")
                         
+                elif self.reconstruction_check == "both":
+                    if epoch % 100 == 0 and epoch != 0:
+                        last_recons_check_epoch = epoch
+
+                        # Compute Frobenius error for diagnostics
+                        with torch.no_grad():
+                            A_hat = model.reconstruct()
+                            frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
+                            edge_index_from_neighbors = get_edge_index_embeddings(model.X, model.Y, model.beta)
+                            common_edges = compare_edge_indices(self.dataloader.data.edge_index, edge_index_from_neighbors)
+                            perc_edges_reconstructed = len(common_edges) / self.dataloader.data.edge_index.size(1) * 100
+                        
+                        is_fully_reconstructed = frob_error_norm <= self.threshold and len(common_edges) == self.dataloader.data.num_edges
+
+                    # update progress bar
+                    pbar.set_description(f"{model_class_name} {loss_fn_name} lr={scheduler.get_last_lr()} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_recons_check_epoch}={frob_error_norm or .0:.4f}, edges_reconstructed@{last_recons_check_epoch}={perc_edges_reconstructed or .0:.2f}%")
 
                 
                 # Break if fully reconstructed

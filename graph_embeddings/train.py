@@ -29,7 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('--load-ckpt', type=str, default='none', help='path to load model checkpoint (ckpt) from (default: %(default)s)')
     parser.add_argument('--save-ckpt', type=str, default='results/model.pt', help='path to save model checkpoint (ckpt) to (default: %(default)s)')
     parser.add_argument('--model-init', type=str, default='random', choices=['random', 'load', 'pre-svd', 'post-svd'], help='how to initialize the model (default: %(default)s)')
-    parser.add_argument('--recons-check', type=str, default='frob', choices=['frob', 'neigh'], help='how to check reconstruction quality (default: %(default)s)')
+    parser.add_argument('--recons-check', type=str, default='frob', choices=['frob', 'neigh', 'both'], help='how to check reconstruction quality (default: %(default)s)')
     parser.add_argument('--dataset', type=str, default='Planetoid/Cora', help='dataset to train on (default: %(default)s)')
     parser.add_argument('--batchsize-percentage', type=float, default=1.0, help='percentage of the dataset to use as batch size (default: %(default)s)')
 

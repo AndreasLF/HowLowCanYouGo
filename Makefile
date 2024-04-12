@@ -40,10 +40,11 @@ run_experiments:
 
 DEVICE = cuda
 RANK = 50
-LR = 1.0
+LR = 0.1
 EPOCHS = 10_000
 DATASET = Planetoid/Cora
 BATCH_SIZE_PERCENTAGE = 1.0 # batch = full adj
+RECONS_CHECK = both
 
 TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
 		--rank $(RANK) \
@@ -51,6 +52,7 @@ TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
 		--model-init random \
 		--dataset $(DATASET) \
 		--batchsize-percentage $(BATCH_SIZE_PERCENTAGE) \
+		--recons-check $(RECONS_CHECK) \
 		--device $(DEVICE)
 
 train-ll2:
