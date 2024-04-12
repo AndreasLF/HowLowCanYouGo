@@ -17,6 +17,9 @@ class Config:
             except (KeyError, TypeError):
                 return None
         return value
+    
+    def set(self, key, value):
+        self.CFG[key] = value
      
     def __str__(self):
         # Return the YAML formatted string for prettier printing

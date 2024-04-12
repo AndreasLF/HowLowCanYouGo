@@ -27,7 +27,8 @@ class Trainer:
                  loggers=[JSONLogger], 
                  project_name='GraphEmbeddings',
                  dataset_path='not specified',
-                 reconstruction_check="frob"):
+                 reconstruction_check="frob",
+                 exp_id='not specified'):
         """Initialize the trainer."""   
         
         self.dataloader = dataloader
@@ -42,6 +43,7 @@ class Trainer:
         self.loggers = loggers
         self.project_name = project_name
         self.dataset_path = dataset_path
+        self.exp_id = exp_id
 
         assert reconstruction_check in ["frob", "neigh"]
         self.reconstruction_check = reconstruction_check
@@ -50,24 +52,22 @@ class Trainer:
 
     def calc_frob_error_norm(self, logits, adj):
         """Compute the Frobenius error norm between the logits and the adjacency matrix."""
-        clipped_logits = torch.clip(logits, min=0, max=1)
-        return torch.linalg.norm(clipped_logits - adj) / torch.linalg.norm(adj)
+        logits[logits >= self.thresh] = 1.
+        logits[logits < self.thresh] = 0.
+        frob_err = torch.linalg.norm(logits - A) / torch.linalg.norm(A)
+        return frob_err
+
 
     def init_model(self,
                    rank: int|None = None):
             if self.model_init == 'random':
                 assert rank is not None
-                model = self.model_class.init_random(self.dataloader.num_total_nodes, self.dataloader.num_total_nodes, rank).to(self.device)
+                model = self.model_class.init_random(self.dataloader.num_total_nodes, 
+                                                     self.dataloader.num_total_nodes, 
+                                                     rank).to(self.device)
             elif self.model_init == 'load':
                 model_params = torch.load(self.load_ckpt,map_location=self.device)
                 model = self.model_class(*model_params)
-            # elif self.model_init == 'pre-svd':
-            #     assert rank is not None
-            #     U,_,V = torch.svd_lowrank(self.adj, q=rank)
-            #     model = self.model_class.init_pre_svd(U, V).to(self.device)
-            # elif self.model_init == 'post-svd':
-            #     model_params = torch.load(self.load_ckpt,map_location=self.device)
-            #     model = self.model_class.init_post_svd(*model_params)
             else:
                 raise Exception(f"selected model initialization ({self.model_init}) is not currently implemented")
                 
@@ -77,7 +77,8 @@ class Trainer:
               rank: int, 
               model: L2Model|PCAModel|None = None,
               lr: float = 0.01, 
-              early_stop_patience: float = None, 
+              adjust_lr_patience: float = None, 
+              eval_recon_freq: int = 100, # ! evaluate full reconstruction every {x}'th epoch
               save_path: str = None):
         """ Train the model using the given optimizer and loss function.
         
@@ -100,7 +101,7 @@ class Trainer:
         last_recons_check_epoch = None
         perc_edges_reconstructed = None
         frob_error_norm = None
-        fully_reconstructed = False
+        is_fully_reconstructed = False
 
         # ----------- Initialize logging -----------
         # get loss_fn function name
@@ -117,10 +118,11 @@ class Trainer:
                                 'loss_fn': loss_fn_name, 
                                 'model_class': model_class_name,
                                 'dataset_path': dataset_path,
-                                'early_stop_patience': early_stop_patience,
-                                'batch_size': batch_size
-                                })
-
+                                'adjust_lr_patience': adjust_lr_patience,
+                                'batch_size': batch_size,
+                                'exp_id': self.exp_id,
+                                'reconstruction_check': self.reconstruction_check,
+                                })         
 
         """
         # ----------- Shift adjacency matrix -----------
@@ -138,7 +140,7 @@ class Trainer:
             
         if self.reconstruction_check == "frob":
             self.adj = self.dataloader.full_adj.to(self.device) # ! used for small graphs for FROB
-
+   
         # ----------- Optimizer ----------- 
         optimizer = optim.Adam(model.parameters(), lr=lr)
 
@@ -147,34 +149,28 @@ class Trainer:
         gamma = .5  # Decay factor
         scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
 
+        # ----------- Loss and Reconstruction measures -----------
+        if loss_fn_name == 'PoissonLoss': self.thresh = torch.log(torch.tensor(.5))  # for the Poisson objective, we threshold our logits at log(1/2), corresponding to 0.5 under Poisson formulation
+        else: self.thresh = 0 # for the Bernoulli objectives, we threshold logits at 0, corresponding to 0.5 under Bernoulli formulation
+
         # ----------- Training loop -----------
         with tqdm(range(num_epochs)) as pbar:
-
-            best_loss = float('inf')  # Initialize best_loss to a very high value
-            epochs_no_improve = 0  # Counter to keep track of epochs with no improvement
-
+            best_loss = float('inf')  # Keep track of best loss -> track improvement to check if we want to decrease learning rate
+            epochs_no_improve = 0  # Counter to keep track of epochs with no improvement -> track when to decrease learning rate
             for epoch in pbar:
-                """
-                # Forward pass
-                optimizer.zero_grad()
-                A_hat = model.reconstruct()
-                loss = loss_fn(A_hat, A)
-                loss.backward()
-                optimizer.step()
-                """
-
                 losses = []
-
                 for b_idx, batch in enumerate(self.dataloader):
                     batch.to(self.device)
+                    if loss_fn_name == 'PoissonLoss': A = batch.adj # use normal adjacency matrix (indices in {0,1})
+                    else: A = batch.adj_s                           # use shifted adjacency matrix (indices in {-1,1})
+
                     # Forward pass
-                    optimizer.zero_grad()
-                    A_hat = model.reconstruct(batch.indices) 
-                    loss = loss_fn(A_hat, batch.adj_s)
+                    optimizer.zero_grad(set_to_none=True)
+                    A_hat = model.reconstruct(batch.indices)
+                    loss = loss_fn(A_hat, A)
                     loss.backward()
                     optimizer.step()
                     losses.append(loss.item())
-
                 epoch_loss = sum(losses) / len(losses)
 
 
@@ -191,10 +187,10 @@ class Trainer:
                         for logger in self.loggers:
                             logger.log(metrics)
 
-                        fully_reconstructed = frob_error_norm <= self.threshold
+                        is_fully_reconstructed = frob_error_norm <= self.threshold
 
                     # update progress bar
-                    pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_recons_check_epoch}={frob_error_norm or .0:.4f}")
+                    pbar.set_description(f"{model_class_name} {loss_fn_name} lr={scheduler.get_last_lr()} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_recons_check_epoch}={frob_error_norm or .0:.4f}")
                         
                 elif self.reconstruction_check == "neigh":
                     if epoch % 100 == 0 and epoch != 0: # ! only check every {x}'th epoch
@@ -207,15 +203,15 @@ class Trainer:
                             common_edges = compare_edge_indices(self.dataloader.data.edge_index, edge_index_from_neighbors)
                             perc_edges_reconstructed = len(common_edges) / self.dataloader.data.edge_index.size(1) * 100
                         
-                        fully_reconstructed = len(common_edges) == self.dataloader.data.num_edges
+                        is_fully_reconstructed = len(common_edges) == self.dataloader.data.num_edges
 
                     # update progress bar
-                    pbar.set_description(f"{model.__class__.__name__} rank={rank}, loss={epoch_loss:.1f} edges_reconstructed@{last_recons_check_epoch}={perc_edges_reconstructed or .0:.2f}%")
+                    pbar.set_description(f"{model_class_name} {loss_fn_name} lr={scheduler.get_last_lr()} rank={rank}, loss={epoch_loss:.1f} edges_reconstructed@{last_recons_check_epoch}={perc_edges_reconstructed or .0:.2f}%")
                         
 
                 
                 # Break if fully reconstructed
-                if fully_reconstructed:
+                if is_fully_reconstructed:
                     pbar.close()
                     for logger in self.loggers:
                         logger.config.update({'full_reconstruction': True})
@@ -223,7 +219,7 @@ class Trainer:
                     print(f'Full reconstruction at epoch {epoch} with rank {rank}')
                     break
 
-                if early_stop_patience is not None:
+                if adjust_lr_patience is not None:
                     # Early stopping condition based on loss improvement
                     if loss < best_loss:
                         best_loss = loss  # Update best loss
@@ -232,10 +228,10 @@ class Trainer:
                         epochs_no_improve += 1  # Increment counter if no improvement
 
                     # Check if early stopping is triggered
-                    if epochs_no_improve >= early_stop_patience:
+                    if epochs_no_improve >= adjust_lr_patience:
                         for logger in self.loggers:
                             logger.config.update({'early_stop_triggered': True})
-                        print(f"Early stopping triggered at epoch {epoch}. No improvement in loss for {early_stop_patience} consecutive epochs.")
+                        print(f"Early stopping triggered at epoch {epoch}. No improvement in loss for {adjust_lr_patience} consecutive epochs.")
                         scheduler.step()
                         epochs_no_improve = 0
                         # break
@@ -257,7 +253,7 @@ class Trainer:
             logger.finish()
 
         # return final_outputs
-        return model
+        return is_fully_reconstructed
 
     def _save_model(self, model, path):
         """Save the model to a file."""
@@ -317,10 +313,14 @@ class Trainer:
         save_path = None # ! just ignore initial model
         model = self.init_model(rank=max_rank)
         if self.model_init != 'load':
-            model = self.train(max_rank, model=model, lr=lr, early_stop_patience=early_stop_patience, save_path=save_path)
+            self.train(max_rank, model=model, lr=lr, adjust_lr_patience=early_stop_patience, save_path=save_path)
         
         def compute_svd_target(model):
-            X,Y,*_ = model.forward()
+            """
+            Computes SVD on the the centered concatenation of our X and Y embedding matrices.
+            The SVD will thus correspond to PCA.
+            """
+            X,Y,*_ = model.forward() # get X and Y, disregard other parameters (i.e. beta)
             svd_target = torch.concatenate([X,Y], dim=0)
             return svd_target - svd_target.mean(dim=0).unsqueeze(0) # center svd_target -> PCA
         svd_target = compute_svd_target(model)
@@ -338,30 +338,17 @@ class Trainer:
             # 2. Perform SVD estimate from higher into lower rank approx.
             _,_,V = torch.svd_lowrank(svd_target, q=current_rank)
             X,Y = torch.chunk(svd_target, 2, dim=0)
-            model = model.__class__(X@V, Y@V).to(self.device)
+            model = model.__class__(X@V, Y@V).to(self.device) # create new model instance with the PCA projected embedding matrices
 
             # 3. Train new model
-            model = self.train(current_rank, 
+            is_fully_reconstructed = self.train(current_rank, 
                                model=model, 
                                lr=lr, 
-                               early_stop_patience=early_stop_patience, 
+                               adjust_lr_patience=early_stop_patience, 
                                save_path=save_path)
 
-
-            if self.reconstruction_check == "frob":
-                # Calculate the Frobenius error
-                logits = model.reconstruct()
-                frob_error = self.calc_frob_error_norm(logits, self.adj)
-                fully_reconstructed = frob_error <= self.threshold
-            
-            elif self.reconstruction_check == "neigh":
-                # Calculate the Frobenius error
-                edge_index_from_neighbors = get_edge_index_embeddings(model.X, model.Y, model.beta)
-                common_edges = compare_edge_indices(self.dataloader.data.edge_index, edge_index_from_neighbors)
-                fully_reconstructed = len(common_edges) == self.dataloader.data.num_edges
-
             # Check if the reconstruction is within the threshold
-            if fully_reconstructed:
+            if is_fully_reconstructed:
                 print(f'Full reconstruction at rank {current_rank}\n')
                 optimal_rank = current_rank  # Update the optimal rank if reconstruction is within the threshold
                 upper_bound = current_rank - 1  # Try to find a smaller rank
@@ -371,5 +358,5 @@ class Trainer:
             else:
                 print(f'Full reconstruction NOT found for rank {current_rank}\n')
                 lower_bound = current_rank + 1
-        print()
+
         return optimal_rank

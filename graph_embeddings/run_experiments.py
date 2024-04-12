@@ -2,7 +2,7 @@ import pdb
 import torch
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.models.PCAModel import PCAModel
-from graph_embeddings.utils.loss import LogisticLoss, HingeLoss
+from graph_embeddings.utils.loss import LogisticLoss, HingeLoss, PoissonLoss
 from graph_embeddings.utils.trainer import Trainer
 import argparse
 
@@ -13,6 +13,8 @@ from graph_embeddings.utils.dataloader import CustomGraphDataLoader
 from graph_embeddings.data.make_datasets import get_data_from_torch_geometric
 
 from utils.config import Config
+
+import uuid
 
 def run_experiment(config: Config, 
                    device: str = 'cpu', 
@@ -52,22 +54,26 @@ def run_experiment(config: Config,
         for loss_type in loss_types:
             print(f"# Training {model_type} model with {loss_type}...")
 
+            unique_id = str(uuid.uuid4())
+
+
             # Determine the model and loss function based on config
             model_class = {'PCA': PCAModel, 'L2': L2Model}[model_type]
-            loss_fn = {'logistic': LogisticLoss, 'hinge': HingeLoss}[loss_type]()
+            loss_fn = {'poisson': PoissonLoss, 'logistic': LogisticLoss, 'hinge': HingeLoss}[loss_type]()
             
             load_ckpt = config.get('load_ckpt')
             model_init = config.get('model_init') or 'random'
             
-            loggers = {0: [], 1: [JSONLogger], 2: [JSONLogger, wandb]}[loglevel]
+            loggers = {0: [], 1: [JSONLogger], 2: [JSONLogger, wandb], 3: [wandb]}[loglevel]
+            
             # Initialize the trainer
 
             recons_check = config.get("recons_check") or "frob"
             trainer = Trainer(dataloader=dataloader, model_class=model_class, 
                               loss_fn=loss_fn, model_init=model_init,
-                              threshold=1e-10, num_epochs=config.get("num_epochs"),
+                              threshold=0., num_epochs=config.get("num_epochs"),
                               device=device, loggers=loggers, dataset_path=dataset_path, 
-                              save_ckpt=results_folder, load_ckpt=load_ckpt, reconstruction_check=recons_check)
+                              save_ckpt=results_folder, load_ckpt=load_ckpt, reconstruction_check=recons_check, exp_id=unique_id)
             # If rank_range is specified, search for the optimal rank
             rank_range = config.get('rank_range')
             if rank_range:
@@ -82,8 +88,10 @@ def main():
     parser.add_argument('--device', type=str, default='cpu')
     parser.add_argument('--all', action='store_true', help='Run all experiments')
     parser.add_argument('--experiment', type=str, default=None, help='Run a specific experiment')
-    parser.add_argument('--loglevel', default="2", choices=["0","1","2"], help='Log level [0: nothing, 1: logs to JSON, 2: logs to JSON and WANDB]')
     parser.add_argument('--recons-check', default="frob", choices=["frob","neigh"], help='Method to check for full reconstruction [frob: frobenius error, neigh: nearest neighbours in embedding space]')
+    parser.add_argument('--loglevel', default="3", choices=["0","1","2","3"], help='Log level [0: nothing, 1: logs to JSON, 2: logs to JSON and WANDB, 3: logs to WANDB only]')
+    parser.add_argument('--loss', type=str, default=None, help='Loss function to use (logistic, hinge, poisson). Default uses config file, only pass this argument to overwrite it.')
+    parser.add_argument('--model', type=str, default=None, help='Model to use (PCA, L2). Default uses config file, only pass this argument to overwrite it.')
 
     args = parser.parse_args()
     device = args.device
@@ -99,6 +107,12 @@ def main():
         for experiment in main_config.get('experiments'):
             print(f"Running experiment {experiment['name']} from config {experiment['config_path']}...")
             exp_config = Config(experiment['config_path'])
+
+            # check if loss and model are specified
+            if args.loss:
+                exp_config.set('loss_types', [args.loss])
+            if args.model:
+                exp_config.set('model_types', [args.model])
 
             # print the whole config
             print(f"{'='*50}\n{exp_config}\n{'='*50}")
@@ -121,6 +135,12 @@ def main():
             raise ValueError(f"Experiment {exp_name} not found in main config")
 
         exp_config = Config(config_path)
+
+        # check if loss and model are specified
+        if args.loss:
+            exp_config.set('loss_types', [args.loss])
+        if args.model:
+            exp_config.set('model_types', [args.model])
 
         print("="*50)
         # print the whole config

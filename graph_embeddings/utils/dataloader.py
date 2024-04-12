@@ -66,8 +66,11 @@ def subgraph_custom(self, subset: Tensor) -> 'Data':
 Data.subgraph = subgraph_custom
 
 class Batch:
-    def __init__(self, sub_graph: torch_geometric.data.Data):
+    def __init__(self, 
+                 sub_graph: torch_geometric.data.Data, 
+                 retain_non_connected: bool = False):
         self.sub_graph = sub_graph
+        self.retain_non_connected = retain_non_connected # ! temp fix for training on full adj matrix
 
     def to(self, device):
         self.sub_graph = self.sub_graph.to(device)
@@ -75,11 +78,17 @@ class Batch:
 
     @cached_property
     def indices(self):
-        return self.sub_graph.edge_index.unique()
-  
+        if self.retain_non_connected: self.sub_graph.edge_index # ! temp fix for training on full adj matrix
+        else: return self.sub_graph.edge_index.unique()
+
     @cached_property
     def adj(self):
-        A = edge_index_to_adjacency_matrix(self.sub_graph.edge_index)
+        A = to_dense_adj(self.sub_graph.edge_index).squeeze(0)
+        if not self.retain_non_connected: # ! temp fix for training on full adj matrix
+            A = A[~torch.all(A == 0, dim=1)]
+            A = A[:, ~torch.all(A == 0, dim=0)]
+        # add 1 to diagonal
+        A = A.fill_diagonal_(1)
         return A
 
     @cached_property
@@ -88,7 +97,7 @@ class Batch:
         return A_tilde
 
 class CustomGraphDataLoader:
-    def __init__(self, data: torch_geometric.data.Data, batch_size: int = 256):
+    def __init__(self, data: torch_geometric.data.Data, batch_size: int):
         self.data = data
         self.batch_size = batch_size
         self.num_nodes = data.num_nodes
@@ -97,7 +106,8 @@ class CustomGraphDataLoader:
 
     def __iter__(self):
         for sub_data in self.sampler:
-            yield Batch(sub_data)
+            cond = (self.batch_size == self.num_total_nodes)
+            yield Batch(sub_data, retain_non_connected=cond)
 
     def __len__(self):
         return self.num_parts

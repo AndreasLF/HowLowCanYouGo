@@ -42,10 +42,15 @@ DEVICE = cuda
 RANK = 50
 LR = 1.0
 EPOCHS = 10_000
+DATASET = Planetoid/Cora
+BATCH_SIZE_PERCENTAGE = 1.0 # batch = full adj
+
 TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
 		--rank $(RANK) \
 		--lr $(LR) --num-epochs $(EPOCHS) \
 		--model-init random \
+		--dataset $(DATASET) \
+		--batchsize-percentage $(BATCH_SIZE_PERCENTAGE) \
 		--device $(DEVICE)
 
 train-ll2:
@@ -66,6 +71,10 @@ train-hpca:
 		--model-type PCA --loss-type hinge \
 		--save-ckpt results/hpca.pt
 
+train-simple-l2:
+	$(TRAIN_RANDOM) \
+		--model-type L2 --loss-type simple \
+		--save-ckpt results/sl2.pt
 train-pl2:
 	$(TRAIN_RANDOM) \
 		--model-type L2 --loss-type poisson \
