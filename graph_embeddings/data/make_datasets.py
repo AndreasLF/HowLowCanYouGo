@@ -68,7 +68,7 @@ extra_datasets = {
 
 # Monekypatch: Add the datasets to the available datasets in SNAPDataset
 SNAPDataset.available_datasets.update(extra_datasets)
-print(SNAPDataset.available_datasets)
+# print(SNAPDataset.available_datasets)
 
 # Save the original process method
 original_process = SNAPDataset.process
