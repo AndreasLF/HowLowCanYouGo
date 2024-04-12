@@ -124,20 +124,6 @@ class Trainer:
                                 'reconstruction_check': self.reconstruction_check,
                                 })         
 
-        """
-        # ----------- Shift adjacency matrix -----------
-        # shift adj matrix to -1's and +1's
-        if loss_fn_name == 'PoissonLoss':
-            print("using adjacency")
-            A = self.adj # adjacency matrix used in loss function
-        else:
-            print("using shifted adjacency")
-            A = self.adj*2 - 1 # shifted adjacency matrix used in loss function
-        # # ----------- Shift adjacency matrix -----------
-        # # shift adj matrix to -1's and +1's
-        # adj_s = self.adj*2 - 1
-        """
-            
         if self.reconstruction_check == "frob" or self.reconstruction_check == "both":
             self.adj = self.dataloader.full_adj.to(self.device) # ! used for small graphs for FROB
    
@@ -146,13 +132,13 @@ class Trainer:
 
         # ----------- Scheduler -----------
         step_size = 1
-        gamma = .5  # Decay factor
+        gamma = .5  # multiplicative decay factor
         scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
 
         # ----------- Loss and Reconstruction measures -----------
         if loss_fn_name == 'PoissonLoss': self.thresh = torch.log(torch.tensor(.5))  # for the Poisson objective, we threshold our logits at log(1/2), corresponding to 0.5 under Poisson formulation
         else: self.thresh = 0 # for the Bernoulli objectives, we threshold logits at 0, corresponding to 0.5 under Bernoulli formulation
-
+                
         # ----------- Training loop -----------
         with tqdm(range(num_epochs)) as pbar:
             best_loss = float('inf')  # Keep track of best loss -> track improvement to check if we want to decrease learning rate
@@ -160,14 +146,23 @@ class Trainer:
             for epoch in pbar:
                 losses = []
                 for b_idx, batch in enumerate(self.dataloader):
-                    batch.to(self.device)
-                    if loss_fn_name == 'PoissonLoss': A = batch.adj # use normal adjacency matrix (indices in {0,1})
-                    else: A = batch.adj_s                           # use shifted adjacency matrix (indices in {-1,1})
-
                     # Forward pass
                     optimizer.zero_grad(set_to_none=True)
-                    A_hat = model.reconstruct(batch.indices)
-                    loss = loss_fn(A_hat, A)
+                    
+                    if self.dataloader.__class__.__name__ == "CaseControlDataLoader": 
+                        # for CC, we only reconstruct specific indices
+                        links,nonlinks,coeffs = batch
+                        # pdb.set_trace()
+                        preds = model.reconstruct_subset(links, nonlinks) 
+                        loss = loss_fn(preds, links.shape[1], coeffs)
+                    else:
+                        # ? specific to "full" adjacency matrix reconstruction
+                        batch.to(self.device)
+                        if loss_fn_name == 'PoissonLoss': A = batch.adj # use normal adjacency matrix (indices in {0,1})
+                        else: A = batch.adj_s                           # use shifted adjacency matrix (indices in {-1,1})
+                        A_hat = model.reconstruct(batch.indices) 
+                        loss = loss_fn(A_hat, A)
+
                     loss.backward()
                     optimizer.step()
                     losses.append(loss.item())
@@ -175,7 +170,7 @@ class Trainer:
 
 
                 if self.reconstruction_check == "frob":
-                    if epoch % 100 == 0 and epoch != 0: # ! only check every {x}'th epoch
+                    if epoch % eval_recon_freq == 0 and epoch != 0: # ! only check every {x}'th epoch
                         last_recons_check_epoch = epoch
                         # Compute Frobenius error for diagnostics
                         with torch.no_grad():  # Ensure no gradients are computed in this block
@@ -225,7 +220,6 @@ class Trainer:
                     # update progress bar
                     pbar.set_description(f"{model_class_name} {loss_fn_name} lr={scheduler.get_last_lr()} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_recons_check_epoch}={frob_error_norm or .0:.4f}, edges_reconstructed@{last_recons_check_epoch}={perc_edges_reconstructed or .0:.2f}%")
 
-                
                 # Break if fully reconstructed
                 if is_fully_reconstructed:
                     pbar.close()
@@ -262,7 +256,6 @@ class Trainer:
                 self._save_model(model, save_path)
                 for logger in self.loggers:
                     logger.config.update({"model_path": save_path})
-
 
         # Finish logging
         for logger in self.loggers:

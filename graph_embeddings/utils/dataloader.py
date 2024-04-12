@@ -123,30 +123,51 @@ class CustomGraphDataLoader:
         A = A.fill_diagonal_(1)
         return A
 
-class CaseControl:
-    def __init__(self, data: torch_geometric.data.Data, batch_size: int, negative_sampling_ratio: int = 5):
+class CaseControlDataLoader:
+    def __init__(self, 
+                 data: torch_geometric.data.Data, 
+                 batch_size: int, 
+                 negative_sampling_ratio: int = 5):
         self.data = data
         self.batch_size = batch_size
-        self.num_nodes = data.num_nodes
-        self.num_parts = (self.num_nodes + self.batch_size - 1) // self.batch_size
+        self.num_total_nodes = data.num_nodes
+        self.num_parts = (self.num_total_nodes + self.batch_size - 1) // self.batch_size
         self.neg_ratio = negative_sampling_ratio
 
+    @cached_property
+    def full_adj(self):
+        """
+        get full adjacency matrix for testing.
+        """
+        A = to_dense_adj(self.data.edge_index).squeeze(0)
+        # add 1 to diagonal
+        A = A.fill_diagonal_(1)
+        return A
+
     def __iter__(self):
-        for sub_data in self.sampler:
-            yield Batch(sub_data)
+        # sample source indices without replacement
+        sources = torch.randperm(self.num_total_nodes)
+        for i in range(self.num_total_nodes // self.batch_size):
+            src_i = sources[i*self.batch_size : (i+1)*self.batch_size]
+            yield self.sample(src_i)
 
     def __len__(self):
         return self.num_parts
     
-
     def __difference_set(self, a, b):
+        """
+        Treat two tensors as sets, and compute the difference.
+        """
         combined = torch.cat((a, b))
         uniques, counts = combined.unique(return_counts=True)
         difference = uniques[counts == 1]
 
         return difference
     
-    def __intersection_set(self, a, b):
+    def __intersection_set(self, a: torch.Tensor, b: torch.Tensor):
+        """
+        Treat two tensors as sets, and compute the intersection.
+        """
         combined = torch.cat((a, b))
         uniques, counts = combined.unique(return_counts=True)
         intersection = uniques[counts > 1]
@@ -155,47 +176,68 @@ class CaseControl:
 
     @cached_property
     def all_possible_edges(self):
-        return torch.arange(self.num_nodes)
+        return torch.arange(self.num_total_nodes)
 
     def sample_non_links(self, links):
+        """
+        Given a set of links, sample (d x |links|) nonlinks,
+            where d is self.neg_ratio.
+        """
         num_links = len(links)
         possible_non_links =  self.__difference_set(self.all_possible_edges, links)
-
         non_links = possible_non_links[torch.randperm(possible_non_links.size(0))]
         non_links = non_links[:self.neg_ratio*num_links]
-
         return non_links
 
-    def sample(self, batch_size: int):
-        d = 5
-        # without replacemen
-        sources = torch.randperm(self.num_nodes)[:batch_size]
-        srcs_idxs = torch.cat([torch.where(self.data.edge_index[0] == src)[0] for src in sources])
-        trgts = self.data.edge_index[1][srcs_idxs]
-        srcs = self.data.edge_index[0][srcs_idxs]
-        link_edge_index = torch.stack([srcs, trgts], dim=0)
+    def sample(self, sources: torch.Tensor):
+        """
+        Case control sampling, i.e. a calibrated version of positive/negative node sampling.
+            Samples a batch of nodes, for which it returns all their links, and a fixed ratio of nonlinks (hence negative samples).
+            By default the ratio of nonlinks to links is set to 5, meaning we sample (5 x |links|) nonlinks.
+        """
+        link_idxs = torch.cat([torch.where(self.data.edge_index[0] == src)[0] for src in sources]) # maybe more memory efficient? 
+        # matches = self.data.edge_index[0].unsqueeze(0) == sources.unsqueeze(1) # broadcast formulation of above - i.e. parallelized
+        # matches = matches.nonzero(as_tuple=False)        # get pairwise positions in edge_index tensor
+        # link_idxs = matches[:,1] 
 
+        srcs = self.data.edge_index[0][link_idxs]
+        tgts = self.data.edge_index[1][link_idxs]
+        link_edge_index = torch.stack([srcs, tgts], dim=0)
         
+        # # # weighting_coeffs = torch.zeros((2, len(sources))) # weighting coeff for each source, for respectively links and nonlinks
+        weighting_coeffs = [] # weighting coeff for each source for nonlinks, since we subsample these
         all_non_links_target = []
         all_non_links_source = []
-        for src in sources:
+        for idx,src in enumerate(sources): # TODO: refactor to vectorized instead of for loop (if slow)
             links = link_edge_index[1][link_edge_index[0] == src]
-            # difference between all possible edges and targets_
-            non_links = self.sample_non_links(links)
+            nonlinks = self.sample_non_links(links)
 
-            all_non_links_source.append(torch.ones_like(non_links)*src)
-            all_non_links_target.append(non_links)
+            # TODO: remove this assertion, only for testing
+            assert len(self.__intersection_set(links, nonlinks)) == 0, "Intersection between set of links and of non-links is not empty"
 
-            intersection = self.__intersection_set(links, non_links) # TODO: remove this line
-            assert len(intersection) == 0, "Intersection between links and non-links is not empty"
-            
-        non_link_edge_index = torch.stack([torch.cat(all_non_links_source), torch.cat(all_non_links_target)], dim=0)
+            num_links = links.shape[0]
+            num_nonlinks = nonlinks.shape[0]
+            # # # weighting_coeffs[0,idx] = 1                                           # weighting for links
+            all_non_links_source.append(torch.ones_like(nonlinks)*src)
+            all_non_links_target.append(nonlinks)
+            weighting_coeffs.append(torch.ones(num_nonlinks) * (self.num_total_nodes - num_links) / num_nonlinks) # weighting for nonlinks -> #{total nonlinks} div by #{sampled nonlinks}
+
+        # link_masks = link_edge_index[0].unsqueeze(0) == sources # ? could be part of broadcasting formulation
+
+        nonlink_edge_index = torch.vstack([torch.hstack(all_non_links_source), torch.hstack(all_non_links_target)])
+        weighting_coeffs = torch.hstack(weighting_coeffs)
+        
+        return link_edge_index, nonlink_edge_index, weighting_coeffs # ! return (links, nonlinks, weighting_coeffs)
      
 
 if __name__ == '__main__':
     from graph_embeddings.models.L2Model import L2Model
     from graph_embeddings.data.make_datasets import get_data_from_torch_geometric
     from graph_embeddings.utils.config import Config
+
+    import time
+
+    torch.manual_seed(42)
 
     cfg = Config("configs/config.yaml")
    
@@ -209,8 +251,16 @@ if __name__ == '__main__':
     adj_true = torch.load(f"{adj_matrices_path}/Cora.pt")
 
 
-    loader = CaseControl(data, 10)
+    loader = CaseControlDataLoader(data, 3)
+    links,nonlinks,coeffs = next(iter(loader))
     print(loader.sample(10))
+
+    start_time = time.time()
+    links, nonlinks, coeffs = next(iter(loader))
+    end_time = time.time()
+    print(end_time - start_time)
+
+
 
     # dataloader = CustomGraphDataLoader(data,batch_size=data.num_nodes)
     # model = L2Model.init_random(dataloader.num_total_nodes, dataloader.num_total_nodes, 50)

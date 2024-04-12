@@ -61,7 +61,7 @@ class L2Model(nn.Module):
         Y = V @ S_inv_sqrt
         return cls(X,Y,**kwargs)
 
-    # ? multi-dimensional scaling for L2 model instead? 
+
     def reconstruct(self, node_indices: torch.Tensor = None):
         if node_indices is not None:
             X = self.X[node_indices]
@@ -79,6 +79,17 @@ class L2Model(nn.Module):
         A_hat = - norms + self.beta
         
         return A_hat
+    
+    def reconstruct_subset(self, 
+                           links_list: torch.Tensor, 
+                           nonlinks_list: torch.Tensor):
+        # ! for Case Control
+        index_list = torch.hstack([links_list, nonlinks_list])
+        X = self.X[index_list[0]]
+        Y = self.Y[index_list[1]]
+        preds = self.beta - torch.norm(X - Y, p=2, dim=1)
+        
+        return preds
 
     def forward(self):
         if self.S is not None: # during pretraining, i.e. SVD target

@@ -16,6 +16,23 @@ class LogisticLoss(BaseLoss):
         l_loss = (torch.logaddexp(zero,-z)).sum()
         return l_loss
 
+class CaseControlLogisticLoss(BaseLoss):
+    def __call__(self, 
+                preds: torch.Tensor,        # link predictions: ordered according to [links, nonlinks] as output from CaseControlDataLoader
+                num_links: int,             # number of links
+                weight_coeffs: torch.Tensor
+                ):
+        # links
+        z1 = torch.logaddexp(torch.zeros(num_links), -preds[:num_links])
+
+        # nonlinks
+        # z0 = -preds[num_links:] # mult by -1 => same as mult by shifted adjacency matrix index for nonlink
+        # pdb.set_trace()
+        z0 = torch.logaddexp(torch.zeros(preds.shape[0] - num_links), preds[num_links:]) 
+        z0 *= weight_coeffs
+        
+        return z0.sum() + z1.sum()
+
 class HingeLoss(BaseLoss):
     def __call__(self, 
                  A_hat: torch.Tensor, 
@@ -41,15 +58,3 @@ class PoissonLoss(BaseLoss):
         p2 = torch.exp(A_hat)
         p_loss = (p2 - p1).sum()
         return p_loss
-
-class SimpleLoss(BaseLoss):
-    def __call__(self,
-                 A_hat: torch.Tensor,
-                 adj: torch.Tensor
-                 ):
-        """
-        Does not work.
-        """
-        adj_sum = adj.sum()
-        weight = 1 + (adj.numel() - adj_sum) / adj_sum
-        return ((1. - weight * adj)*A_hat).sum()
