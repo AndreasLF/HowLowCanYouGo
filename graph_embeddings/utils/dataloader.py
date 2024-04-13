@@ -80,7 +80,7 @@ class Batch:
     def adj(self):
         num_nodes = self.indices.shape[0]
         # Initialize the adjacency matrix with zeros
-        A = torch.zeros((num_nodes, num_nodes), dtype=torch.float)
+        A = self.sub_graph.edge_index.new_zeros((num_nodes,num_nodes))
         # Fill in the adjacency matrix with ones where there are edges
         A[self.sub_graph.edge_index[0], self.sub_graph.edge_index[1]] = 1
         # add 1 to diagonal
