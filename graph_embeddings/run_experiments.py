@@ -11,6 +11,7 @@ import wandb
 from graph_embeddings.utils.logger import JSONLogger
 from graph_embeddings.utils.dataloader import RandomNodeDataLoader
 from graph_embeddings.data.make_datasets import get_data_from_torch_geometric
+from graph_embeddings.utils.wandb_api_utils import WANDbAPIUtils
 
 from utils.config import Config
 
@@ -82,6 +83,12 @@ def run_experiment(config: Config,
                                         lr=config.get('lr'), 
                                         early_stop_patience=config.get('early_stop_patience'), 
                                         experiment_name=experiment_name)
+                
+            # if wandb is in loggers, tag the best rank
+            if wandb in loggers:
+                wandb_api = WANDbAPIUtils(trainer.project_name)
+                # tag the best rank
+                wandb_api.tag_best_rank(unique_id) 
 
 def main():
     parser = argparse.ArgumentParser()
