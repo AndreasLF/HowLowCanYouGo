@@ -14,7 +14,7 @@ import pdb
 import wandb
 from graph_embeddings.utils.logger import JSONLogger
 
-from graph_embeddings.utils.dataloader import CaseControlDataLoader, CustomGraphDataLoader
+from graph_embeddings.utils.dataloader import CaseControlDataLoader, RandomNodeDataLoader
 from graph_embeddings.data.make_datasets import get_data_from_torch_geometric
 from graph_embeddings.utils.config import Config
 
@@ -56,7 +56,7 @@ if __name__ == '__main__':
     data = dataset[0]
 
     if args.batching_type == 'random':
-        dataloader = CustomGraphDataLoader(data, batch_size=int(args.batchsize_percentage*data.num_nodes))
+        dataloader = RandomNodeDataLoader(data, batch_size=int(args.batchsize_percentage*data.num_nodes))
     elif args.batching_type == 'casecontrol': 
         dataloader = CaseControlDataLoader(data, batch_size=int(args.batchsize_percentage*data.num_nodes), negative_sampling_ratio=5)
         assert args.loss_type == 'logistic', "Case Control batching only implemented for logistic loss!"
