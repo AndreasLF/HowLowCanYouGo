@@ -10,6 +10,8 @@ from torch_geometric.utils import select, subgraph
 from torch_geometric.data import Data
 import pdb
 
+from graph_embeddings.utils.set_ops import difference_set, intersection_set
+
 def edge_index_to_adjacency_matrix(edge_index):
     # Identify all unique nodes and their new indices
     unique_nodes, new_indices = torch.unique(edge_index, return_inverse=True)
@@ -122,6 +124,12 @@ class CustomGraphDataLoader:
         # add 1 to diagonal
         A = A.fill_diagonal_(1)
         return A
+    
+    @cached_property
+    def edge_index_with_selfloops(self):
+        edge_index = self.data.edge_index
+        src_tgt = torch.arange(self.num_nodes)
+        return torch.hstack([edge_index,torch.vstack([src_tgt,src_tgt])])
 
 class CaseControlDataLoader:
     def __init__(self, 
@@ -154,25 +162,6 @@ class CaseControlDataLoader:
     def __len__(self):
         return self.num_parts
     
-    def __difference_set(self, a, b):
-        """
-        Treat two tensors as sets, and compute the difference.
-        """
-        combined = torch.cat((a, b))
-        uniques, counts = combined.unique(return_counts=True)
-        difference = uniques[counts == 1]
-
-        return difference
-    
-    def __intersection_set(self, a: torch.Tensor, b: torch.Tensor):
-        """
-        Treat two tensors as sets, and compute the intersection.
-        """
-        combined = torch.cat((a, b))
-        uniques, counts = combined.unique(return_counts=True)
-        intersection = uniques[counts > 1]
-
-        return intersection
 
     @cached_property
     def all_possible_edges(self):
@@ -184,7 +173,7 @@ class CaseControlDataLoader:
             where d is self.neg_ratio.
         """
         num_links = len(links)
-        possible_non_links =  self.__difference_set(self.all_possible_edges, links)
+        possible_non_links =  difference_set(self.all_possible_edges, links)
         non_links = possible_non_links[torch.randperm(possible_non_links.size(0))]
         non_links = non_links[:self.neg_ratio*num_links]
         return non_links
@@ -213,7 +202,7 @@ class CaseControlDataLoader:
             nonlinks = self.sample_non_links(links)
 
             # TODO: remove this assertion, only for testing
-            assert len(self.__intersection_set(links, nonlinks)) == 0, "Intersection between set of links and of non-links is not empty"
+            assert len(intersection_set(links, nonlinks)) == 0, "Intersection between set of links and of non-links is not empty"
 
             num_links = links.shape[0]
             num_nonlinks = nonlinks.shape[0]

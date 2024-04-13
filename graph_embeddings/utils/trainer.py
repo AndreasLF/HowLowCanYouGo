@@ -6,12 +6,15 @@ from torch.optim.lr_scheduler import StepLR
 from tqdm import tqdm
 import os
 
+from torch_geometric.utils import to_dense_adj
+
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.models.PCAModel import PCAModel
 from graph_embeddings.utils.load_data import load_adj
 from graph_embeddings.utils.logger import JSONLogger
 
 from graph_embeddings.utils.nearest_neighbours_reconstruction_check import get_edge_index_embeddings, compare_edge_indices
+from graph_embeddings.utils.set_ops import equals_set
 
 class Trainer:
     def __init__(self, 
@@ -102,6 +105,7 @@ class Trainer:
         perc_edges_reconstructed = None
         frob_error_norm = None
         is_fully_reconstructed = False
+        recons_report_str = None
 
         # ----------- Initialize logging -----------
         # get loss_fn function name
@@ -125,6 +129,7 @@ class Trainer:
                                 })         
 
         if self.reconstruction_check == "frob" or self.reconstruction_check == "both":
+            print("[WARNING]: Loading dense Adjacency Matrix!")
             self.adj = self.dataloader.full_adj.to(self.device) # ! used for small graphs for FROB
    
         # ----------- Optimizer ----------- 
@@ -169,8 +174,11 @@ class Trainer:
                 epoch_loss = sum(losses) / len(losses)
 
 
-                if self.reconstruction_check == "frob":
-                    if epoch % eval_recon_freq == 0 and epoch != 0: # ! only check every {x}'th epoch
+                if (epoch % eval_recon_freq == 0) and (epoch != 0): # ! only check every {x}'th epoch
+                    last_recons_check_epoch = epoch
+                    recons_report_str = ""
+
+                    if self.reconstruction_check in {"frob", "both"}:
                         last_recons_check_epoch = epoch
                         # Compute Frobenius error for diagnostics
                         with torch.no_grad():  # Ensure no gradients are computed in this block
@@ -184,41 +192,28 @@ class Trainer:
 
                         is_fully_reconstructed = frob_error_norm <= self.threshold
 
-                    # update progress bar
-                    pbar.set_description(f"{model_class_name} {loss_fn_name} lr={scheduler.get_last_lr()} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_recons_check_epoch}={frob_error_norm or .0:.4f}")
-                        
-                elif self.reconstruction_check == "neigh":
-                    if epoch % 100 == 0 and epoch != 0: # ! only check every {x}'th epoch
-                        print("TEST1")
-                        last_recons_check_epoch = epoch
-
+                        recons_report_str += f" frob-err={frob_error_norm or .0:.4f}" # for progress bar
+                            
+                    if self.reconstruction_check in {"neigh", "both"}:
                         # Compute Frobenius error for diagnostics
-                        with torch.no_grad():
-                            edge_index_from_neighbors = get_edge_index_embeddings(model.X, model.Y, model.beta)
-                            common_edges = compare_edge_indices(self.dataloader.data.edge_index, edge_index_from_neighbors)
-                            perc_edges_reconstructed = len(common_edges) / self.dataloader.data.edge_index.size(1) * 100
+                        if model.beta >= 0: # ! ensure beta is nonnegative, as we use it for radius when computing nearest neighbors
+                            with torch.no_grad():
+                                edge_index_from_neighbors = get_edge_index_embeddings(model.X, model.Y, model.beta)
+                                is_fully_reconstructed, frac_correct = equals_set(edge_index_from_neighbors, 
+                                                                                #   self.dataloader.data.edge_index,         # ? normal edge_index
+                                                                                  self.dataloader.edge_index_with_selfloops, # ? edge_index augmented with selfloops
+                                                                                  return_frac=True)
                         
-                        is_fully_reconstructed = len(common_edges) == self.dataloader.data.num_edges
+                            # TODO testing
+                            # recon_dense_adj = to_dense_adj(edge_index_from_neighbors).squeeze()
+                            # print()
 
-                    # update progress bar
-                    pbar.set_description(f"{model_class_name} {loss_fn_name} lr={scheduler.get_last_lr()} rank={rank}, loss={epoch_loss:.1f} edges_reconstructed@{last_recons_check_epoch}={perc_edges_reconstructed or .0:.2f}%")
-                        
-                elif self.reconstruction_check == "both":
-                    if epoch % 100 == 0 and epoch != 0:
-                        last_recons_check_epoch = epoch
+                        recons_report_str += f" knn-reconstruct={frac_correct*100 or .0:.2f}%" # for progress bar
+                
 
-                        # Compute Frobenius error for diagnostics
-                        with torch.no_grad():
-                            A_hat = model.reconstruct()
-                            frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
-                            edge_index_from_neighbors = get_edge_index_embeddings(model.X, model.Y, model.beta)
-                            common_edges = compare_edge_indices(self.dataloader.data.edge_index, edge_index_from_neighbors)
-                            perc_edges_reconstructed = len(common_edges) / self.dataloader.data.edge_index.size(1) * 100
-                        
-                        is_fully_reconstructed = frob_error_norm <= self.threshold and len(common_edges) == self.dataloader.data.num_edges
-
-                    # update progress bar
-                    pbar.set_description(f"{model_class_name} {loss_fn_name} lr={scheduler.get_last_lr()} rank={rank}, loss={epoch_loss:.1f} frob_err@{last_recons_check_epoch}={frob_error_norm or .0:.4f}, edges_reconstructed@{last_recons_check_epoch}={perc_edges_reconstructed or .0:.2f}%")
+                # update progress bar
+                model_report_str = f"{model_class_name}" + (f"[beta={model.beta.item():.1f}]" if model_class_name == "L2Model" else "")
+                pbar.set_description(f"{loss_fn_name} {model_report_str} lr={scheduler.get_last_lr()[0]} rank={rank}, loss={epoch_loss:.1f} [@{last_recons_check_epoch or 0}:{recons_report_str or 'Ø'}]")
 
                 # Break if fully reconstructed
                 if is_fully_reconstructed:

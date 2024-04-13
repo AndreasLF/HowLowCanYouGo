@@ -12,7 +12,7 @@ class L2Model(nn.Module):
         super(L2Model, self).__init__()
         self.X = nn.Parameter(X) if not inference_only else X
         self.Y = nn.Parameter(Y) if not inference_only else Y
-        self.beta = nn.Parameter(torch.randn(1)) # (scalar) free parameter bias term
+        self.beta = nn.Parameter(torch.rand(1)) # (scalar) free parameter bias term
         self.S = None # ! only set if pretraining on SVD objective
 
     @classmethod
