@@ -9,7 +9,7 @@ import argparse
 # import loggers
 import wandb
 from graph_embeddings.utils.logger import JSONLogger
-from graph_embeddings.utils.dataloader import CustomGraphDataLoader
+from graph_embeddings.utils.dataloader import RandomNodeDataLoader
 from graph_embeddings.data.make_datasets import get_data_from_torch_geometric
 
 from utils.config import Config
@@ -45,7 +45,7 @@ def run_experiment(config: Config,
 
     # Either use the batch size from the config or set it to the number of nodes i.e. the whole graph
     batch_size = config.get('batch_size') or int(data.num_nodes)
-    dataloader = CustomGraphDataLoader(data, batch_size=batch_size)
+    dataloader = RandomNodeDataLoader(data, batch_size=batch_size)
     
     model_types = config.get('model_types')
     loss_types = config.get('loss_types')
