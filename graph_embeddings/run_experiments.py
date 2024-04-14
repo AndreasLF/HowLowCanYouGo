@@ -46,7 +46,7 @@ def run_experiment(config: Config,
 
     # Either use the batch size from the config or set it to the number of nodes i.e. the whole graph
     batch_size = config.get('batch_size') or int(data.num_nodes)
-    dataloader = RandomNodeDataLoader(data, batch_size=batch_size)
+    dataloader = RandomNodeDataLoader(data, batch_size=batch_size, dataset_name=dataset.name)
     
     model_types = config.get('model_types')
     loss_types = config.get('loss_types')
@@ -73,8 +73,8 @@ def run_experiment(config: Config,
             trainer = Trainer(dataloader=dataloader, model_class=model_class, 
                               loss_fn=loss_fn, model_init=model_init,
                               threshold=0., num_epochs=config.get("num_epochs"),
-                              device=device, loggers=loggers, dataset_path=dataset_path, 
-                              save_ckpt=results_folder, load_ckpt=load_ckpt, reconstruction_check=recons_check, exp_id=unique_id)
+                              device=device, loggers=loggers, save_ckpt=results_folder, 
+                              load_ckpt=load_ckpt, reconstruction_check=recons_check, exp_id=unique_id)
             # If rank_range is specified, search for the optimal rank
             rank_range = config.get('rank_range')
             if rank_range:

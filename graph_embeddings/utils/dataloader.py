@@ -99,10 +99,12 @@ class RandomNodeDataLoader(torch.utils.data.DataLoader):
         self,
         data: Data,
         batch_size: int,
+        dataset_name: str = None,
         **kwargs,
     ):
         self.data = data
         self.batch_size = batch_size
+        self.dataset_name = dataset_name
 
         edge_index = data.edge_index
 
@@ -144,12 +146,14 @@ class CaseControlDataLoader:
     def __init__(self, 
                  data: torch_geometric.data.Data, 
                  batch_size: int, 
-                 negative_sampling_ratio: int = 5):
+                 negative_sampling_ratio: int = 5,
+                 dataset_name: str = None):
         self.data = data
         self.batch_size = batch_size
         self.num_total_nodes = data.num_nodes
         self.num_parts = (self.num_total_nodes + self.batch_size - 1) // self.batch_size
         self.neg_ratio = negative_sampling_ratio
+        self.dataset_name = dataset_name
 
     @cached_property
     def full_adj(self):
@@ -243,44 +247,46 @@ if __name__ == '__main__':
     adj_matrices_path = cfg.get("data", "adj_matrices_path")
 
     # %%
-    dataset = get_data_from_torch_geometric("Planetoid", "Cora", raw_path)
+    dataset = get_data_from_torch_geometric("SNAPDataset", "ca-HepPh", raw_path)
+    print(dataset.name)
 
     data = dataset[0]
     adj_true = torch.load(f"{adj_matrices_path}/Cora.pt")
 
 
-    loader = CaseControlDataLoader(data, 3)
-    links,nonlinks,coeffs = next(iter(loader))
-    print(loader.sample(10))
+    # loader = CaseControlDataLoader(data, 3)
+    # links,nonlinks,coeffs = next(iter(loader))
+    # print(loader.sample(10))
 
-    start_time = time.time()
-    links, nonlinks, coeffs = next(iter(loader))
-    end_time = time.time()
-    print(end_time - start_time)
-
-
-    # dataloader = RandomNodeDataLoader(data,batch_size=512)
-    # model = L2Model.init_random(dataloader.num_total_nodes, dataloader.num_total_nodes, 50)
-
-    # fulladj = dataloader.full_adj
-    # compare = torch.all(fulladj == adj_true)
-    # print("Adjacency matrices are equal:", compare.item())
+    # start_time = time.time()
+    # links, nonlinks, coeffs = next(iter(loader))
+    # end_time = time.time()
+    # print(end_time - start_time)
 
 
-    # for b_idx, batch in enumerate(dataloader):
-    #     print("Batch:", b_idx)
-    #     idx = batch.indices
+    dataloader = RandomNodeDataLoader(data,batch_size=512, datasetname=dataset.name)
+    print(dataloader.data)
+    model = L2Model.init_random(dataloader.num_total_nodes, dataloader.num_total_nodes, 50)
 
-    #     # only take out a submatrix of the adj_true matrix
-    #     adj_true_sub = adj_true[idx][:,idx]
-    #     batch_adj = batch.adj
+    fulladj = dataloader.full_adj
+    compare = torch.all(fulladj == adj_true)
+    print("Adjacency matrices are equal:", compare.item())
 
-    #     # compare the adjacency matrices
-    #     compare = torch.all(adj_true_sub == batch_adj)
-    #     print("  Adjacency matrices in batch are equal:", compare.item())
 
-    #     print("  Batch adj shape:", batch.adj.shape)
-    #     print("  Batch adj_s shape:", batch.adj_s.shape)
-    #     print("  Batch indices shape:", batch.indices.shape)
-    #     print("  Reconstruct shape:", model.reconstruct(idx).shape)
-    #     break
+    for b_idx, batch in enumerate(dataloader):
+        print("Batch:", b_idx)
+        idx = batch.indices
+
+        # only take out a submatrix of the adj_true matrix
+        adj_true_sub = adj_true[idx][:,idx]
+        batch_adj = batch.adj
+
+        # compare the adjacency matrices
+        compare = torch.all(adj_true_sub == batch_adj)
+        print("  Adjacency matrices in batch are equal:", compare.item())
+
+        print("  Batch adj shape:", batch.adj.shape)
+        print("  Batch adj_s shape:", batch.adj_s.shape)
+        print("  Batch indices shape:", batch.indices.shape)
+        print("  Reconstruct shape:", model.reconstruct(idx).shape)
+        break

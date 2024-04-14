@@ -29,7 +29,6 @@ class Trainer:
                  device='cpu', 
                  loggers=[JSONLogger], 
                  project_name='GraphEmbeddings',
-                 dataset_path='not specified',
                  reconstruction_check="frob",
                  exp_id='not specified'):
         """Initialize the trainer."""   
@@ -45,7 +44,6 @@ class Trainer:
         self.device = device
         self.loggers = loggers
         self.project_name = project_name
-        self.dataset_path = dataset_path
         self.exp_id = exp_id
 
         assert reconstruction_check in ["frob", "neigh", "both"]
@@ -98,7 +96,6 @@ class Trainer:
 
         loss_fn = self.loss_fn
         num_epochs = self.num_epochs
-        dataset_path = self.dataset_path
         full_reconstruction = False
         batch_size = self.dataloader.batch_size
         last_recons_check_epoch = None
@@ -121,7 +118,7 @@ class Trainer:
                                 'learning_rate': lr,
                                 'loss_fn': loss_fn_name, 
                                 'model_class': model_class_name,
-                                'dataset_path': dataset_path,
+                                'data': self.dataloader.dataset_name,
                                 'adjust_lr_patience': adjust_lr_patience,
                                 'batch_size': batch_size,
                                 'exp_id': self.exp_id,
@@ -213,7 +210,7 @@ class Trainer:
 
                 # update progress bar
                 model_report_str = f"{model_class_name}" + (f"[beta={model.beta.item():.1f}]" if model_class_name == "L2Model" else "")
-                pbar.set_description(f"{loss_fn_name} {model_report_str} lr={scheduler.get_last_lr()[0]} rank={rank}, loss={epoch_loss:.1f} [@{last_recons_check_epoch or 0}:{recons_report_str or 'Ø'}]")
+                pbar.set_description(f"{self.dataloader.dataset_name} {loss_fn_name} {model_report_str} lr={scheduler.get_last_lr()[0]} rank={rank}, loss={epoch_loss:.1f} [@{last_recons_check_epoch or 0}:{recons_report_str or 'Ø'}]")
 
                 # Break if fully reconstructed
                 if is_fully_reconstructed:
