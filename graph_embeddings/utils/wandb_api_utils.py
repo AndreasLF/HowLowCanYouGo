@@ -49,6 +49,26 @@ class WANDbAPIUtils:
             print(f"Best run {runs[min_rank_idx].name} has rank {ranks[min_rank_idx]}")
             runs[min_rank_idx].update()
 
+    def add_column_to_exp(self, column_name, column_value, exp_id):
+        runs = self.runs
+
+        # Get runs with the same experiment id
+        matching_runs = [run for run in runs if run.config.get("exp_id") == exp_id]
+
+        for run in matching_runs:
+            run.config[column_name] = column_value
+            run.update()
+
+    def remove_column_from_exp(self, column_name, exp_id):
+        runs = self.runs
+
+        # Get runs with the same experiment id
+        matching_runs = [run for run in runs if run.config.get("exp_id") == exp_id]
+
+        for run in matching_runs:
+            run.config.pop(column_name)
+            run.update()
+
 if __name__ == '__main__':
     project_name = "GraphEmbeddings"  # format: "username/projectname"
     exp_id = "2533580a-b17b-452f-ad0c-aaf36d733af2"  # experiment id to tag
@@ -56,4 +76,4 @@ if __name__ == '__main__':
     wandb_api = WANDbAPIUtils(project_name)
     # wandb_api.tag_best_rank(exp_id)
 
-    wandb_api.update_all_best_rank_tags()
+    wandb_api.add_column_to_runs("data", "Cora")
