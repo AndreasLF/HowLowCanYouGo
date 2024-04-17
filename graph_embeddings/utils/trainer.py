@@ -192,6 +192,7 @@ class Trainer:
                         recons_report_str += f" frob-err={frob_error_norm or .0:.4f}" # for progress bar
                             
                     if self.reconstruction_check in {"neigh", "both"}:
+                        assert loss_fn_name != 'PoissonLoss', "Nearest neighbors reconstruction check not implemented for PoissonLoss"
                         # Compute Frobenius error for diagnostics
                         if model.beta >= 0: # ! ensure beta is nonnegative, as we use it for radius when computing nearest neighbors
                             with torch.no_grad():
