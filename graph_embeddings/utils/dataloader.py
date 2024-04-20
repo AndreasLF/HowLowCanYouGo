@@ -71,7 +71,7 @@ class Batch:
     def __init__(self, 
                  sub_graph: torch_geometric.data.Data, 
                  indices: torch.Tensor):
-        self.indices = indices 
+        self.indices = indices.sort()[0]
         self.sub_graph = sub_graph
 
     def to(self, device):
@@ -81,10 +81,26 @@ class Batch:
     @cached_property
     def adj(self):
         num_nodes = self.indices.shape[0]
+        indices = self.indices
+
+        # pdb.set_trace()
         # Initialize the adjacency matrix with zeros
         A = self.sub_graph.edge_index.new_zeros((num_nodes,num_nodes))
+
+        src = self.sub_graph.edge_index[0]
+        tgt = self.sub_graph.edge_index[1]
+
+        # torch.bucketize is similar to numpy's searchsorted
+        src_idx = torch.bucketize(src, indices)
+        tgt_idx = torch.bucketize(tgt, indices)
+
+        # Verify if src and tgt exactly match the indices. Just for testing
+        # assert torch.all(indices[src_idx] == self.sub_graph.edge_index[0])
+        # assert torch.all(indices[tgt_idx] == self.sub_graph.edge_index[1])
+
         # Fill in the adjacency matrix with ones where there are edges
-        A[self.sub_graph.edge_index[0], self.sub_graph.edge_index[1]] = 1
+        A[src_idx, tgt_idx] = 1
+
         # add 1 to diagonal
         A.fill_diagonal_(1)
         return A
@@ -100,6 +116,7 @@ class RandomNodeDataLoader(torch.utils.data.DataLoader):
         data: Data,
         batch_size: int,
         dataset_name: str = None,
+        shuffle: bool = True, # shuffle is True by default, because we want to cover the whole graph across epochs
         **kwargs,
     ):
         self.data = data
@@ -115,6 +132,7 @@ class RandomNodeDataLoader(torch.utils.data.DataLoader):
             range(self.num_nodes),
             batch_size=batch_size,
             collate_fn=self.collate_fn,
+            shuffle=shuffle,
             **kwargs,
         )
 

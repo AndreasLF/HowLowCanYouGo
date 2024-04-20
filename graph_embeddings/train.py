@@ -56,8 +56,10 @@ if __name__ == '__main__':
     data = dataset[0]
 
     if args.batching_type == 'random':
-        dataloader = RandomNodeDataLoader(data, batch_size=int(args.batchsize_percentage*data.num_nodes), dataset_name=dataset.name)
+        print("Using random batching with batch size: ", int(args.batchsize_percentage*data.num_nodes))
+        dataloader = RandomNodeDataLoader(data, batch_size=int(args.batchsize_percentage*data.num_nodes), dataset_name=dataset.name, shuffle=True)
     elif args.batching_type == 'casecontrol': 
+        print("Using case control batching with batch size: ", int(args.batchsize_percentage*data.num_nodes))
         dataloader = CaseControlDataLoader(data, batch_size=int(args.batchsize_percentage*data.num_nodes), dataset_name=dataset.name, negative_sampling_ratio=5)
         assert args.loss_type == 'logistic', "Case Control batching only implemented for logistic loss!"
 
