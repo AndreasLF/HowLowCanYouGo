@@ -76,6 +76,7 @@ class Batch:
 
     def to(self, device):
         self.sub_graph = self.sub_graph.to(device)
+        self.indices = self.indices.to(device)
         return self
 
     @cached_property
@@ -159,8 +160,152 @@ class RandomNodeDataLoader(torch.utils.data.DataLoader):
 
         return Batch(self.data.subgraph(index), index)
 
+class CaseControlBatch:
+    def __init__(self, 
+                 edge_index: torch.Tensor, 
+                 indices: torch.Tensor, 
+                 negative_sampling_ratio: int,
+                 num_nodes: int = None):
+        self.edge_index = edge_index
+        self.indices = indices.sort()[0]    
+        self.negative_sampling_ratio = negative_sampling_ratio
+        self.num_nodes = num_nodes
 
-class CaseControlDataLoader:
+    def to(self, device):
+        self.sub_graph = self.sub_graph.to(device)
+        return self
+    
+    @cached_property
+    def links(self):
+        return self.edge_index
+
+    @cached_property
+    def nonlinks(self):
+        """
+        Given a set of links, sample (d x |links|) nonlinks,
+            where d is self.negative_sampling_ratio.
+        """
+        num_nodes = self.num_nodes
+        srcs, targets = self.links
+        unique_srcs = srcs.unique()
+
+        # Calculate the number of samples to take for non-links
+        num_samples_per_src = (srcs.bincount(minlength=num_nodes) * self.negative_sampling_ratio).long()
+
+        all_non_links = []
+
+        for src in unique_srcs:
+            # Identify all targets connected to the current source
+            current_targets = targets[srcs == src]
+
+            # Create a tensor of all nodes and mask out the current targets
+            mask = torch.ones(num_nodes, dtype=torch.bool)
+            mask[current_targets] = False
+            
+            # Possible non-links are where mask is True
+            possible_non_links = torch.masked_select(torch.arange(num_nodes), mask)
+
+            # Number of non-links to sample
+            num_samples = min(num_samples_per_src[src].item(), possible_non_links.numel())
+            # num_samples = possible_non_links.numel()
+
+            # Sample without replacement from the possible non-links
+            if num_samples > 0:
+                sampled_indices = torch.randperm(possible_non_links.numel())[:num_samples]
+                sampled_non_links = possible_non_links[sampled_indices]
+                # sampled_non_links = possible_non_links
+
+                # Form the (2, num_samples) tensor of [src, non-link]
+                nonlinks = torch.stack((torch.full((num_samples,), src, dtype=src.dtype), sampled_non_links))
+                all_non_links.append(nonlinks)
+
+        # Concatenate all results along the second dimension if any non-links were sampled
+        if all_non_links:
+            non_links_tensor = torch.cat(all_non_links, dim=1)
+        else:
+            non_links_tensor = torch.empty((2, 0), dtype=torch.long)  # return an empty tensor if no non-links
+
+        return non_links_tensor    
+
+    @cached_property
+    def coeffs(self):
+        
+        weighting_coeffs = [] # weighting coeff for each source for nonlinks, since we subsample these
+
+        non_links = self.nonlinks
+        links = self.links
+
+        unique_srcs = torch.unique(links[0])
+
+
+        for idx,src in enumerate(unique_srcs):
+            num_links = links[1][links[0] == src].shape[0]
+            num_nonlinks = non_links[1][non_links[0] == src].shape[0]
+            weighting_coeffs.append(torch.ones(num_nonlinks) * (self.num_nodes - num_links) / num_nonlinks) # weighting for nonlinks -> #{total nonlinks} div by #{sampled nonlinks}
+
+        return torch.hstack(weighting_coeffs)
+
+class CaseControlDataLoader(torch.utils.data.DataLoader):
+    def __init__(
+        self,
+        data: Data,
+        batch_size: int,
+        negative_sampling_ratio: int = 5,
+        dataset_name: str = None,
+        shuffle: bool = True, # shuffle is True by default, because we want to cover the whole graph across epochs
+        **kwargs,
+    ):
+        self.data = data
+        self.batch_size = batch_size
+        self.dataset_name = dataset_name
+        self.negative_sampling_ratio = negative_sampling_ratio
+
+        edge_index = data.edge_index
+
+        self.edge_index = edge_index
+        self.num_nodes = data.num_nodes
+
+        super().__init__(
+            range(self.num_nodes),
+            batch_size=batch_size,
+            collate_fn=self.collate_fn,
+            shuffle=shuffle,
+            **kwargs,
+        )
+
+    @cached_property
+    def num_total_nodes(self):
+        return self.data.num_nodes
+    
+    @cached_property
+    def full_adj(self):
+        A = to_dense_adj(self.data.edge_index).squeeze(0)
+        # add 1 to diagonal
+        A.fill_diagonal_(1)
+        return A
+    
+    @cached_property
+    def edge_index_with_selfloops(self):
+        edge_index = self.data.edge_index
+        src_tgt = torch.arange(self.num_nodes)
+        return torch.hstack([edge_index,torch.vstack([src_tgt,src_tgt])])
+
+    def collate_fn(self, index):
+        if not isinstance(index, Tensor):
+            index = torch.tensor(index)
+
+        src = self.data.edge_index[0]
+        tgt = self.data.edge_index[1]
+
+        # get indices where index is in src 
+        matches = torch.where(src.unsqueeze(0) == index.unsqueeze(1))
+
+        new_edge_index = torch.vstack([src[matches[1]], tgt[matches[1]]])
+
+        return CaseControlBatch(edge_index=new_edge_index, indices=index, 
+                                negative_sampling_ratio=self.negative_sampling_ratio, num_nodes=self.num_nodes)
+
+class CaseControlDataLoaderOLD:
     def __init__(self, 
                  data: torch_geometric.data.Data, 
                  batch_size: int, 
@@ -272,39 +417,46 @@ if __name__ == '__main__':
     adj_true = torch.load(f"{adj_matrices_path}/Cora.pt")
 
 
-    # loader = CaseControlDataLoader(data, 3)
-    # links,nonlinks,coeffs = next(iter(loader))
-    # print(loader.sample(10))
+    loader = CaseControlDataLoader(data, 10)
 
-    # start_time = time.time()
-    # links, nonlinks, coeffs = next(iter(loader))
-    # end_time = time.time()
-    # print(end_time - start_time)
-
-
-    dataloader = RandomNodeDataLoader(data,batch_size=512, datasetname=dataset.name)
-    print(dataloader.data)
-    model = L2Model.init_random(dataloader.num_total_nodes, dataloader.num_total_nodes, 50)
-
-    fulladj = dataloader.full_adj
-    compare = torch.all(fulladj == adj_true)
-    print("Adjacency matrices are equal:", compare.item())
-
-
-    for b_idx, batch in enumerate(dataloader):
+    for b_idx, batch in enumerate(loader):
         print("Batch:", b_idx)
-        idx = batch.indices
-
-        # only take out a submatrix of the adj_true matrix
-        adj_true_sub = adj_true[idx][:,idx]
-        batch_adj = batch.adj
-
-        # compare the adjacency matrices
-        compare = torch.all(adj_true_sub == batch_adj)
-        print("  Adjacency matrices in batch are equal:", compare.item())
-
-        print("  Batch adj shape:", batch.adj.shape)
-        print("  Batch adj_s shape:", batch.adj_s.shape)
-        print("  Batch indices shape:", batch.indices.shape)
-        print("  Reconstruct shape:", model.reconstruct(idx).shape)
+        links, nonlinks, coeffs = batch.links, batch.non_links, batch.coeffs
+        print("  Links shape:", links.shape)
+        print("  Nonlinks shape:", nonlinks.shape)
+        print("  Coeffs shape:", coeffs.shape)
         break
+
+    # loaderOLD = CaseControlDataLoaderOLD(data, 10)
+    # links, nonlinks, coeffs = next(iter(loaderOLD))
+    # print("  Links shape:", links.shape)
+    # print("  Nonlinks shape:", nonlinks.shape)
+    # print("  Coeffs shape:", coeffs.shape)
+
+
+    # dataloader = RandomNodeDataLoader(data,batch_size=512, datasetname=dataset.name)
+    # print(dataloader.data)
+    # model = L2Model.init_random(dataloader.num_total_nodes, dataloader.num_total_nodes, 50)
+
+    # fulladj = dataloader.full_adj
+    # compare = torch.all(fulladj == adj_true)
+    # print("Adjacency matrices are equal:", compare.item())
+
+
+    # for b_idx, batch in enumerate(dataloader):
+    #     print("Batch:", b_idx)
+    #     idx = batch.indices
+
+    #     # only take out a submatrix of the adj_true matrix
+    #     adj_true_sub = adj_true[idx][:,idx]
+    #     batch_adj = batch.adj
+
+    #     # compare the adjacency matrices
+    #     compare = torch.all(adj_true_sub == batch_adj)
+    #     print("  Adjacency matrices in batch are equal:", compare.item())
+
+    #     print("  Batch adj shape:", batch.adj.shape)
+    #     print("  Batch adj_s shape:", batch.adj_s.shape)
+    #     print("  Batch indices shape:", batch.indices.shape)
+    #     print("  Reconstruct shape:", model.reconstruct(idx).shape)
+    #     break

@@ -153,7 +153,7 @@ class Trainer:
                     
                     if self.dataloader.__class__.__name__ == "CaseControlDataLoader": 
                         # for CC, we only reconstruct specific indices
-                        links,nonlinks,coeffs = batch
+                        links,nonlinks,coeffs = batch.links, batch.nonlinks, batch.coeffs
                         # pdb.set_trace()
                         preds = model.reconstruct_subset(links, nonlinks) 
                         loss = loss_fn(preds, links.shape[1], coeffs)
