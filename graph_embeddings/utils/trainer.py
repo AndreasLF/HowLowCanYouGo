@@ -177,6 +177,7 @@ class Trainer:
                     last_recons_check_epoch = epoch
                     recons_report_str = ""
 
+                    metrics = {'epoch': epoch, 'loss': epoch_loss}
                     if self.reconstruction_check in {"frob", "both"}:
                         last_recons_check_epoch = epoch
                         # Compute Frobenius error for diagnostics
@@ -184,10 +185,9 @@ class Trainer:
                             A_hat = model.reconstruct()
                             frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
 
-                        # Log metrics to all loggers
-                        metrics = {'epoch': epoch, 'loss': epoch_loss, 'frob_error_norm': frob_error_norm.item()}
-                        for logger in self.loggers:
-                            logger.log(metrics)
+                        # Log metrics to all loggers'
+                        metrics['frob_error_norm'] = frob_error_norm.item()
+                       
 
                         is_fully_reconstructed = frob_error_norm <= self.threshold
 
@@ -209,6 +209,12 @@ class Trainer:
                             # print()
 
                         recons_report_str += f" knn-reconstruct={frac_correct*100 or .0:.2f}%" # for progress bar
+
+                        metrics['knn_reconstruction'] = frac_correct
+
+                    # Log metrics to all loggers
+                    for logger in self.loggers:
+                        logger.log(metrics)
                 
 
                 # update progress bar
