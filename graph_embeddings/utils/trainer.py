@@ -238,6 +238,11 @@ class Trainer:
                             logger.config.update({'early_stop_triggered': True})
                         print(f"Early stopping triggered at epoch {epoch}. No improvement in loss for {adjust_lr_patience} consecutive epochs.")
                         scheduler.step()
+
+                        if scheduler.get_last_lr()[0] <= 1e-5:
+                            print("Learning rate is too small. Stopping training.")
+                            break
+
                         epochs_no_improve = 0
                         # break
 
