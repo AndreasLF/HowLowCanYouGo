@@ -109,6 +109,7 @@ class Trainer:
         loss_fn_name = loss_fn.__class__.__name__
         # get self.model_class function name
         model_class_name = self.model_class.__name__
+        dataloader_class_name = self.dataloader.__class__.__name__
 
         # initialize logging to all loggers
         for logger in self.loggers:
@@ -121,6 +122,7 @@ class Trainer:
                                 'data': self.dataloader.dataset_name,
                                 'adjust_lr_patience': adjust_lr_patience,
                                 'batch_size': batch_size,
+                                'batch_type': dataloader_class_name,
                                 'exp_id': self.exp_id,
                                 'reconstruction_check': self.reconstruction_check,
                                 })         
