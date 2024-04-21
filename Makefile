@@ -100,3 +100,10 @@ profile:
 	--lr $(LR) --num-epochs $(EPOCHS) \
 	--model-init random \
 	--device $(DEVICE)
+
+
+#################################################################################
+# Plotting                                                                      #
+#################################################################################
+plot-frob-errors:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/plotting/plot_frob_errors.py
