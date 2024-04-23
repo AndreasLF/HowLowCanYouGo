@@ -10,7 +10,6 @@ def get_data_from_wandb(data="Cora", model_class="L2Model", rank=6):
     # Specify your project and run
     project_name = "GraphEmbeddings"
 
-    # %%
     print("Fetching runs...")
     # filter on all runs in the project
     runs = api.runs(path=project_name)
@@ -18,8 +17,6 @@ def get_data_from_wandb(data="Cora", model_class="L2Model", rank=6):
     # data should be = Cora, model_class = L2, rank = 6
     print("Filtering runs...")
     matching_runs = [run for run in tqdm(runs) if run.config.get("data") == data and run.config.get("model_class") == model_class and run.config.get("rank") == rank]
-
-    # %%
 
     # get all unique batch_size values
     batch_sizes = set([run.config.get("batch_size") for run in matching_runs])
@@ -50,6 +47,9 @@ if __name__ == "__main__":
     data = "Cora"
     frob_error_norms, batch_sizes = get_data_from_wandb(data=data, model_class=model, rank=rank)
 
+
+# %%
+
     import matplotlib.pyplot as plt
     from cycler import cycler
     from graph_embeddings.plotting.plotter import PaperStylePlotter
@@ -63,6 +63,7 @@ if __name__ == "__main__":
 
         colors = [colors[0], colors[5]]
 
+        global_longest_epoch_list = []
 
         for b, batch_size in enumerate(batch_sizes):
 
@@ -90,6 +91,10 @@ if __name__ == "__main__":
             # get longest epoch list
             longest_epoch_list = epochs_list[np.argmax([len(epochs) for epochs in epochs_list])]
 
+            # get global longest epoch list
+            global_longest_epoch_list = longest_epoch_list if len(longest_epoch_list) > len(global_longest_epoch_list) else global_longest_epoch_list
+
+
             label = f"{batch_size} (full)" if batch_size == max(batch_sizes) else f"{batch_size}"
             ax.plot(longest_epoch_list, mean_frobs, label=label, color=color, linestyle=linestyle, linewidth=1)
 
@@ -98,9 +103,18 @@ if __name__ == "__main__":
         ax.set_ylabel("Frobenius Error")
         ax.legend(title="Batch Size Mean")
 
+        # max from global longest epoch list
+        max_epoch = max(global_longest_epoch_list)+101
+        ticks = np.arange(0, max_epoch, 5000)
+        # replace 0 with 100 
+        ticks[0] = 100
+        # set x-ticks to max epoch
+        ax.set_xticks(ticks)
+
         # save figure 
         fig_name = "frob_error_norms"
         print("Saving figure to: ", fig_name)
+        plt.show()
         PaperStylePlotter().save_fig(fig, fig_name)
 
 
