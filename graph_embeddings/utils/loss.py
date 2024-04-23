@@ -22,13 +22,15 @@ class CaseControlLogisticLoss(BaseLoss):
                 num_links: int,             # number of links
                 weight_coeffs: torch.Tensor
                 ):
+        
+        device = preds.device
         # links
-        z1 = torch.logaddexp(torch.zeros(num_links), -preds[:num_links])
+        z1 = torch.logaddexp(torch.zeros(num_links, device=device), -preds[:num_links])
 
         # nonlinks
         # z0 = -preds[num_links:] # mult by -1 => same as mult by shifted adjacency matrix index for nonlink
         # pdb.set_trace()
-        z0 = torch.logaddexp(torch.zeros(preds.shape[0] - num_links), preds[num_links:]) 
+        z0 = torch.logaddexp(torch.zeros(preds.shape[0] - num_links, device=device), preds[num_links:]) 
         z0 *= weight_coeffs
         
         return z0.sum() + z1.sum()

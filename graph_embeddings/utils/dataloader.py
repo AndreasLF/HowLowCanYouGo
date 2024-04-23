@@ -172,7 +172,8 @@ class CaseControlBatch:
         self.num_nodes = num_nodes
 
     def to(self, device):
-        self.sub_graph = self.sub_graph.to(device)
+        self.edge_index = self.edge_index.to(device)
+        self.device = device
         return self
     
     @cached_property
@@ -225,7 +226,8 @@ class CaseControlBatch:
         else:
             non_links_tensor = torch.empty((2, 0), dtype=torch.long)  # return an empty tensor if no non-links
 
-        return non_links_tensor    
+
+        return non_links_tensor.to(self.device)
 
     @cached_property
     def coeffs(self):
@@ -243,7 +245,8 @@ class CaseControlBatch:
             num_nonlinks = non_links[1][non_links[0] == src].shape[0]
             weighting_coeffs.append(torch.ones(num_nonlinks) * (self.num_nodes - num_links) / num_nonlinks) # weighting for nonlinks -> #{total nonlinks} div by #{sampled nonlinks}
 
-        return torch.hstack(weighting_coeffs)
+
+        return torch.hstack(weighting_coeffs).to(self.device)
 
 class CaseControlDataLoader(torch.utils.data.DataLoader):
     def __init__(
