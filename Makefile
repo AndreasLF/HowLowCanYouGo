@@ -43,11 +43,11 @@ RANK = 32
 LR = 0.2
 EPOCHS = 10_000
 DATASET = Planetoid/Cora
-# BATCHING_TYPE = casecontrol
-# BATCH_SIZE_PERCENTAGE = 0.5 # batch = full adj
-BATCHING_TYPE = random
-BATCH_SIZE_PERCENTAGE = 1.0 # batch = full adj
-RECONS_CHECK = neigh
+BATCHING_TYPE = casecontrol
+BATCH_SIZE_PERCENTAGE = 0.1 # batch = full adj
+# BATCHING_TYPE = random
+# BATCH_SIZE_PERCENTAGE = 1.0 # batch = full adj
+RECONS_CHECK = frob
 
 TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
 		--rank $(RANK) \
@@ -89,6 +89,9 @@ train-ppca:
 	$(TRAIN_RANDOM) \
 		--model-type PCA --loss-type poisson \
 		--save-ckpt results/ppca.pt
+
+examples:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/examples.py
 
 get_stats:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/make_stats.py --print-latex
