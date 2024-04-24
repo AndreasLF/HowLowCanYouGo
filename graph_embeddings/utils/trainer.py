@@ -29,7 +29,6 @@ class Trainer:
                  device='cpu', 
                  loggers=[JSONLogger], 
                  project_name='GraphEmbeddings',
-                 dataset_path='not specified',
                  reconstruction_check="frob",
                  exp_id='not specified'):
         """Initialize the trainer."""   
@@ -45,7 +44,6 @@ class Trainer:
         self.device = device
         self.loggers = loggers
         self.project_name = project_name
-        self.dataset_path = dataset_path
         self.exp_id = exp_id
 
         assert reconstruction_check in ["frob", "neigh", "both"]
@@ -98,7 +96,6 @@ class Trainer:
 
         loss_fn = self.loss_fn
         num_epochs = self.num_epochs
-        dataset_path = self.dataset_path
         full_reconstruction = False
         batch_size = self.dataloader.batch_size
         last_recons_check_epoch = None
@@ -112,6 +109,7 @@ class Trainer:
         loss_fn_name = loss_fn.__class__.__name__
         # get self.model_class function name
         model_class_name = self.model_class.__name__
+        dataloader_class_name = self.dataloader.__class__.__name__
 
         # initialize logging to all loggers
         for logger in self.loggers:
@@ -121,9 +119,10 @@ class Trainer:
                                 'learning_rate': lr,
                                 'loss_fn': loss_fn_name, 
                                 'model_class': model_class_name,
-                                'dataset_path': dataset_path,
+                                'data': self.dataloader.dataset_name,
                                 'adjust_lr_patience': adjust_lr_patience,
                                 'batch_size': batch_size,
+                                'batch_type': dataloader_class_name,
                                 'exp_id': self.exp_id,
                                 'reconstruction_check': self.reconstruction_check,
                                 })         
@@ -156,7 +155,7 @@ class Trainer:
                     
                     if self.dataloader.__class__.__name__ == "CaseControlDataLoader": 
                         # for CC, we only reconstruct specific indices
-                        links,nonlinks,coeffs = batch
+                        links,nonlinks,coeffs = batch.links, batch.nonlinks, batch.coeffs
                         # pdb.set_trace()
                         preds = model.reconstruct_subset(links, nonlinks) 
                         loss = loss_fn(preds, links.shape[1], coeffs)
@@ -178,6 +177,7 @@ class Trainer:
                     last_recons_check_epoch = epoch
                     recons_report_str = ""
 
+                    metrics = {'epoch': epoch, 'loss': epoch_loss}
                     if self.reconstruction_check in {"frob", "both"}:
                         last_recons_check_epoch = epoch
                         # Compute Frobenius error for diagnostics
@@ -185,16 +185,16 @@ class Trainer:
                             A_hat = model.reconstruct()
                             frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
 
-                        # Log metrics to all loggers
-                        metrics = {'epoch': epoch, 'loss': epoch_loss, 'frob_error_norm': frob_error_norm.item()}
-                        for logger in self.loggers:
-                            logger.log(metrics)
+                        # Log metrics to all loggers'
+                        metrics['frob_error_norm'] = frob_error_norm.item()
+                       
 
                         is_fully_reconstructed = frob_error_norm <= self.threshold
 
                         recons_report_str += f" frob-err={frob_error_norm or .0:.4f}" # for progress bar
                             
                     if self.reconstruction_check in {"neigh", "both"}:
+                        assert loss_fn_name != 'PoissonLoss', "Nearest neighbors reconstruction check not implemented for PoissonLoss"
                         # Compute Frobenius error for diagnostics
                         if model.beta >= 0: # ! ensure beta is nonnegative, as we use it for radius when computing nearest neighbors
                             with torch.no_grad():
@@ -209,11 +209,17 @@ class Trainer:
                             # print()
 
                         recons_report_str += f" knn-reconstruct={frac_correct*100 or .0:.2f}%" # for progress bar
+
+                        metrics['knn_reconstruction'] = frac_correct
+
+                    # Log metrics to all loggers
+                    for logger in self.loggers:
+                        logger.log(metrics)
                 
 
                 # update progress bar
                 model_report_str = f"{model_class_name}" + (f"[beta={model.beta.item():.1f}]" if model_class_name == "L2Model" else "")
-                pbar.set_description(f"{loss_fn_name} {model_report_str} lr={scheduler.get_last_lr()[0]} rank={rank}, loss={epoch_loss:.1f} [@{last_recons_check_epoch or 0}:{recons_report_str or 'Ø'}]")
+                pbar.set_description(f"{self.dataloader.dataset_name} {loss_fn_name} {model_report_str} lr={scheduler.get_last_lr()[0]} rank={rank}, loss={epoch_loss:.1f} [@{last_recons_check_epoch or 0}:{recons_report_str or 'Ø'}]")
 
                 # Break if fully reconstructed
                 if is_fully_reconstructed:
@@ -238,6 +244,11 @@ class Trainer:
                             logger.config.update({'early_stop_triggered': True})
                         print(f"Early stopping triggered at epoch {epoch}. No improvement in loss for {adjust_lr_patience} consecutive epochs.")
                         scheduler.step()
+
+                        if scheduler.get_last_lr()[0] <= 1e-5:
+                            print("Learning rate is too small. Stopping training.")
+                            break
+
                         epochs_no_improve = 0
                         # break
 

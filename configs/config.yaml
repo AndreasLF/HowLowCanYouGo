@@ -1,25 +1,27 @@
 experiments:
   - name: Cora1
     config_path: './configs/experiments/exp1_cora.yaml'
+  - name: Cora2
+    config_path: './configs/experiments/exp2_cora.yaml'
+  - name: Cora3
+    config_path: './configs/experiments/exp2_cora.yaml'
   - name: Citeseer1
     config_path: './configs/experiments/exp1_citeseer.yaml'
   - name: Pubmed1
     config_path: './configs/experiments/exp1_pubmed.yaml'
   - name: Facebook1
     config_path: './configs/experiments/exp1_facebook.yaml'
-  # Add more experiments as needed
   - name: ca-HepPh1
     config_path: './configs/experiments/exp1_ca-hepph.yaml'
   - name: p2p-Gnutella041
     config_path: './configs/experiments/exp1_p2p-gnutella04.yaml'
-  - name: BlogCatalog1
-    config_path: './configs/experiments/exp1_blogcatalog.yaml'
   - name: Wiki-Vote1
     config_path: './configs/experiments/exp1_wiki-vote.yaml'
   - name: ca-GrQc1
     config_path: './configs/experiments/exp1_ca-grqc.yaml'
   - name: email-Enron1
     config_path: './configs/experiments/exp1_email-enron.yaml'
+  # Add more experiments as needed
 data:
   raw_path: ./data/raw
   adj_matrices_path: ./data/adj_matrices

@@ -33,7 +33,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='Planetoid/Cora', help='dataset to train on (default: %(default)s)')
     parser.add_argument('--batchsize-percentage', type=float, default=1.0, help='percentage of the dataset to use as batch size (default: %(default)s)')
     parser.add_argument('--batching-type', type=str, default='random', choices=['random', 'casecontrol'], help='which type of batching to use (default: %(default)s)')
-
+    parser.add_argument('--negatives-ratio', type=int, default=5, help='ratio of negative samples to positive samples in case control batching (default: %(default)s)')
     # torch.set_default_tensor_type(torch.cuda.DoubleTensor)
 
     args = parser.parse_args()
@@ -56,9 +56,11 @@ if __name__ == '__main__':
     data = dataset[0]
 
     if args.batching_type == 'random':
-        dataloader = RandomNodeDataLoader(data, batch_size=int(args.batchsize_percentage*data.num_nodes))
+        print("Using random batching with batch size: ", int(args.batchsize_percentage*data.num_nodes))
+        dataloader = RandomNodeDataLoader(data, batch_size=int(args.batchsize_percentage*data.num_nodes), dataset_name=dataset.name, shuffle=True)
     elif args.batching_type == 'casecontrol': 
-        dataloader = CaseControlDataLoader(data, batch_size=int(args.batchsize_percentage*data.num_nodes), negative_sampling_ratio=5)
+        print("Using case control batching with batch size: ", int(args.batchsize_percentage*data.num_nodes), " and negative sampling ratio: ", args.negatives_ratio)
+        dataloader = CaseControlDataLoader(data, batch_size=int(args.batchsize_percentage*data.num_nodes), dataset_name=dataset.name, negative_sampling_ratio=args.negatives_ratio)
         assert args.loss_type == 'logistic', "Case Control batching only implemented for logistic loss!"
 
     model_init = args.model_init
@@ -79,5 +81,6 @@ if __name__ == '__main__':
     trainer.train(args.rank, 
                   model=model,
                   lr=args.lr, 
-                #   early_stop_patience=100,
+                  eval_recon_freq=10,
+                    adjust_lr_patience=20,
                   save_path=args.save_ckpt)
