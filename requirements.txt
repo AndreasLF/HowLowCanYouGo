@@ -9,3 +9,4 @@ torch==2.1.2
 torch_geometric==2.4.0
 wandb==0.16.3
 tqdm==4.66.1
+imageio==2.34.1
