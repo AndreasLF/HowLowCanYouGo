@@ -5,56 +5,71 @@ import networkx as nx
 from graph_embeddings.utils.config import Config
 import pandas as pd
 import os 
+import torch_geometric
 
+from graph_embeddings.data.make_datasets import get_data_from_torch_geometric
+from torch_geometric.utils import to_dense_adj
 
-def get_stats(adj): 
-    # subtract diagonal
-    adj = adj - torch.eye(adj.shape[0])
+def get_stats(edge_index, num_nodes):
+    # Create a sparse tensor representation from edge_index
+    adj = torch_geometric.utils.to_scipy_sparse_matrix(edge_index, num_nodes=num_nodes)
+    adj.setdiag(0)  # Remove self-loops
+    adj.eliminate_zeros()  # Clean up matrix after modification
 
-    G = nx.Graph()
+    is_symmetric = (adj != adj.T).nnz == 0
+    
+    # Create a NetworkX graph from the adjacency matrix, based on whether it is symmetric or not
+    if is_symmetric:
+        G = nx.Graph(adj)  # Convert to a NetworkX graph by passing the matrix directly  
+    else:
+        G = nx.DiGraph(adj)  
 
-    # Add edges from the sparse matrix
-    rows, cols = scipy.sparse.find(adj)[:2]  # Get the non-zero indices
-    for row, col in zip(rows, cols):
-        G.add_edge(row, col)
+    # make undirected graph for some stats
+    G_undirected = G.to_undirected()
 
-    # calculate number of edges, directed graph. 
-    num_edges = adj.sum()
+    # Number of edges
+    num_edges = adj.nnz / 2  # Since it's undirected
 
     # Calculate the average degree
-    degrees = torch.sum(adj)
-    average_degree = degrees / adj.shape[0]
-
+    degrees = np.array(adj.sum(axis=1)).flatten()
+    average_degree = np.mean(degrees)
+    
     # 95 percentile degree
-    deg_nodes = torch.sum(adj, dim=1)
-    percentile_95 = np.percentile(deg_nodes.numpy(), 95)
+    percentile_95 = np.percentile(degrees, 95)
 
-    # Global Clustering Coefficient
+    # Global Clustering Coefficient (NetworkX)
     clustering_coefficient = nx.average_clustering(G)
-
+    
     # Assortativity
     assortativity = nx.degree_pearson_correlation_coefficient(G)
 
     # Calculate the number of triangles for each node
-    triangles_per_node = nx.triangles(G)
+    triangles_per_node = nx.triangles(G_undirected)
 
     # Calculate the total number of triangles in the graph
     total_triangles = sum(triangles_per_node.values()) // 3
 
+    # Calculate graph density and number of connected components
+    density = nx.density(G)
+    num_connected_components = nx.number_connected_components(G_undirected)
+
+
+    
     return {
-        "num_nodes": adj.shape[0],
-        "num_edges": num_edges.item(),
-        "average_degree": average_degree.item(),
+        "directed/undirected": "undirected" if is_symmetric else "directed", # "directed" if directed else "undirected
+        "num_nodes": num_nodes,
+        "num_edges": num_edges,
+        "average_degree": average_degree,
         "95_percentile_degree": percentile_95,
-        "density": nx.density(G),
-        "num_connected_components": nx.number_connected_components(G),
+        "density": density,
+        "num_connected_components": num_connected_components,
         "clustering_coefficient": clustering_coefficient,
         "assortativity": assortativity,
         "total_triangles": total_triangles
     }
 
 if __name__ == "__main__":
-    
+
 
     import argparse
     parser = argparse.ArgumentParser(description='Arguments for make_stats.py')
@@ -63,10 +78,9 @@ if __name__ == "__main__":
 
     cfg = Config("configs/config.yaml")
 
-    datasets = cfg.get("data", "dataset_src").keys()
+    datasets = cfg.get("data", "dataset_src").values()
     adj_matrix_path = cfg.get("data", "adj_matrices_path")
     stats_path = cfg.get("results", "stats_path")
-
 
     os.makedirs(stats_path, exist_ok=True)
 
@@ -77,18 +91,25 @@ if __name__ == "__main__":
         existing_df = pd.DataFrame()
 
     for dataset in datasets:
+        # split the dataset name
+        datasetsplit = dataset.split("/")
+        dataset_name = datasetsplit[-1]
+
         print(f"Processing dataset: {dataset}")
 
         # Check if this dataset is already in the existing DataFrame
-        if not existing_df.empty and dataset in existing_df['Dataset'].values:
+        if not existing_df.empty and dataset_name in existing_df['Dataset'].values:
             print(f"Stats for {dataset} already exist in CSV, skipping...")
             continue  # Skip this dataset
 
-        adj_matrix = torch.load(f"{adj_matrix_path}/{dataset}.pt")
-        stats = get_stats(adj_matrix)  # get_stats returns a dictionary with the stats
+        # adj_matrix = torch.load(f"{adj_matrix_path}/{dataset}.pt")
+        graph = get_data_from_torch_geometric(datasetsplit[-2], dataset_name, cfg.get("data", "raw_path"))[0]
+        # adj_matrix = to_dense_adj(graph.edge_index).squeeze(0)
+
+        stats = get_stats(graph.edge_index, graph.num_nodes)
 
         # Convert the stats dictionary to a DataFrame
-        df = pd.DataFrame.from_dict({dataset: stats}, orient='index')
+        df = pd.DataFrame.from_dict({dataset_name: stats}, orient='index')
         df.reset_index(inplace=True)
         df.rename(columns={"index": "Dataset"}, inplace=True)
 
@@ -108,32 +129,60 @@ if __name__ == "__main__":
 
     if args.print_latex:
 
-        keep_columns = ["Dataset", "num_nodes", "average_degree", 
+        keep_columns = ["Dataset", "num_nodes", "directed/undirected", "average_degree", 
                         "95_percentile_degree", "num_connected_components", "total_triangles"]
 
         df_loaded = df_loaded[keep_columns]
         # rename columns
-        df_loaded.rename(columns={"num_nodes": "Nodes", "average_degree": "Avg. Degree", 
-                                 "95_percentile_degree": "95th Percentile Degree", 
-                                 "num_connected_components": "Connected Components", 
-                                 "total_triangles": "Total Triangles"}, inplace=True)
+        df_loaded.rename(columns={
+            "num_nodes": "Nodes", 
+            "directed/undirected": "Type", 
+            "average_degree": "Avg.\\newline Degree",
+            "95_percentile_degree": "95th Percentile\\newline Degree",
+            "num_connected_components": "Connected\\newline Components",
+            "total_triangles": "Total\\newline Triangles"
+        }, inplace=True)
 
 
-        # Add two empty columns for the bold rows
-        df_loaded["EFD (L2)"] = ""
-        df_loaded["EFD (LPCA)"] = ""
-        df_loaded["Search start"] = ""
+        dataset_citations = {
+            "Cora": r"Cora \citep{Yang2016RevisitingEmbeddings}",
+            "PubMed": r"Pubmed \citep{Yang2016RevisitingEmbeddings}",
+            "CiteSeer": r"Citeseer \citep{Yang2016RevisitingEmbeddings}",
+            "Facebook": r"Facebook \citep{Yang2020PANE:Embedding}",
+            "ca-HepPh": r"ca-HepPh \citep{Leskovec2005GraphsExplanations, Gehrke2003OverviewCup}",
+            "p2p-Gnutella04": r"p2p-Gnutella04 \citep{Leskovec2007GraphEvolution, Ripeanu2002MappingDesign}",
+            "wiki-Vote": r"Wiki-Vote \citep{Leskovec2010SignedMedia, Leskovec2010PredictingNetworks}",
+            "ca-GrQc": r"ca-GrQc \cite{Leskovec2007GraphEvolution}"
+        }
 
+        df_loaded["Dataset"] = df_loaded["Dataset"].replace(dataset_citations)
 
         # sort dataframe by Nodes
         df_loaded.sort_values(by="Nodes", inplace=True)
 
+        col_format = "l|rcrrrr"
         # dont't use toprule, midrule, bottomrule, instead use \hline
-        latex_code = df_loaded.to_latex(index=False, float_format="%.2f", column_format="l|ccccc|ccc")
+        # latex_code = df_loaded.to_latex(index=False, float_format="%.2f", column_format="l|cccccc")
+        latex_code = df_loaded.to_latex(index=False, column_format=col_format, escape=False, header=False, float_format="%.2f")
 
-        # replace top and bottom rule with \hline
-        latex_code = latex_code.replace("\\toprule", "\\hline")
-        latex_code = latex_code.replace("\\bottomrule", "\\hline")
-        latex_code = latex_code.replace("\\midrule", "\\hline")
+        # Construct the custom header
+        custom_header = r"""
+        \toprule
+        \multicolumn{1}{c|}{Dataset} & \multicolumn{1}{c}{Nodes} & \multicolumn{1}{c}{Type} & \multicolumn{1}{c}{Avg.} & \multicolumn{1}{c}{95th Percentile} & \multicolumn{1}{c}{Connected} & \multicolumn{1}{c}{Total} \\
+        \multicolumn{1}{c|}{} & \multicolumn{1}{c}{} & \multicolumn{1}{c}{} & \multicolumn{1}{c}{Degree} & \multicolumn{1}{c}{Degree} & \multicolumn{1}{c}{Components} & \multicolumn{1}{c}{Triangles} \\
+        \midrule
+        """
 
-        print(latex_code)
+
+        # Adjust LaTeX code to remove default top and mid rules added by pandas
+        # Split on first occurrence of '\midrule' and take the second part (data rows and below)
+        body_start_index = latex_code.find('\\midrule') + 7  # 7 is the length of '\midrule'
+        latex_code_body = latex_code[body_start_index:]
+
+        # Remove any other top or mid rules from the body
+        latex_code_body = latex_code_body.replace('\\toprule', '').replace('\\midrule', '')
+
+        # Combine custom header with the body
+        full_latex_code = f"\\begin{{tabular}}{{{col_format}}}" + custom_header + latex_code_body
+
+        print(full_latex_code)

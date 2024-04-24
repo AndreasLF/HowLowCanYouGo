@@ -2,15 +2,16 @@ import pdb
 import torch
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.models.PCAModel import PCAModel
-from graph_embeddings.utils.loss import LogisticLoss, HingeLoss, PoissonLoss
+from graph_embeddings.utils.loss import LogisticLoss, HingeLoss, PoissonLoss, CaseControlLogisticLoss
 from graph_embeddings.utils.trainer import Trainer
 import argparse
 
 # import loggers
 import wandb
 from graph_embeddings.utils.logger import JSONLogger
-from graph_embeddings.utils.dataloader import CustomGraphDataLoader
+from graph_embeddings.utils.dataloader import RandomNodeDataLoader, CaseControlDataLoader
 from graph_embeddings.data.make_datasets import get_data_from_torch_geometric
+from graph_embeddings.utils.wandb_api_utils import WANDbAPIUtils
 
 from utils.config import Config
 
@@ -44,8 +45,20 @@ def run_experiment(config: Config,
     data = dataset[0]
 
     # Either use the batch size from the config or set it to the number of nodes i.e. the whole graph
-    batch_size = config.get('batch_size') or int(data.num_nodes)
-    dataloader = CustomGraphDataLoader(data, batch_size=batch_size)
+    batch_size_percentage = config.get('batch_size_percentage') or 1.0
+    batch_size = int(batch_size_percentage*data.num_nodes)
+
+    batching_type = config.get('batching_type')
+    if batching_type == "casecontrol":
+        negative_sampling_ratio = config.get('negative_sampling_ratio') or 5
+        print("Using case control node sampling with batch size: ", batch_size, " and negative sampling ratio: ", negative_sampling_ratio)
+        dataloader = CaseControlDataLoader(data, batch_size=batch_size, dataset_name=dataset.name, negative_sampling_ratio=negative_sampling_ratio, shuffle=True)
+    else:
+        if batch_size == data.num_nodes:
+            print("Using full batch training")
+        else:
+            print("Using random node sampling with batch size: ", batch_size)
+        dataloader = RandomNodeDataLoader(data, batch_size=batch_size, dataset_name=dataset.name, shuffle=True)
     
     model_types = config.get('model_types')
     loss_types = config.get('loss_types')
@@ -59,7 +72,8 @@ def run_experiment(config: Config,
 
             # Determine the model and loss function based on config
             model_class = {'PCA': PCAModel, 'L2': L2Model}[model_type]
-            loss_fn = {'poisson': PoissonLoss, 'logistic': LogisticLoss, 'hinge': HingeLoss}[loss_type]()
+            loss_fn = {"logistic": CaseControlLogisticLoss if batching_type == 'casecontrol' else LogisticLoss,
+                "hinge": HingeLoss, "poisson": PoissonLoss}[loss_type]()
             
             load_ckpt = config.get('load_ckpt')
             model_init = config.get('model_init') or 'random'
@@ -72,8 +86,8 @@ def run_experiment(config: Config,
             trainer = Trainer(dataloader=dataloader, model_class=model_class, 
                               loss_fn=loss_fn, model_init=model_init,
                               threshold=0., num_epochs=config.get("num_epochs"),
-                              device=device, loggers=loggers, dataset_path=dataset_path, 
-                              save_ckpt=results_folder, load_ckpt=load_ckpt, reconstruction_check=recons_check, exp_id=unique_id)
+                              device=device, loggers=loggers, save_ckpt=results_folder, 
+                              load_ckpt=load_ckpt, reconstruction_check=recons_check, exp_id=unique_id)
             # If rank_range is specified, search for the optimal rank
             rank_range = config.get('rank_range')
             if rank_range:
@@ -82,6 +96,12 @@ def run_experiment(config: Config,
                                         lr=config.get('lr'), 
                                         early_stop_patience=config.get('early_stop_patience'), 
                                         experiment_name=experiment_name)
+                
+            # if wandb is in loggers, tag the best rank
+            if wandb in loggers:
+                wandb_api = WANDbAPIUtils(trainer.project_name)
+                # tag the best rank
+                wandb_api.tag_best_rank(unique_id) 
 
 def main():
     parser = argparse.ArgumentParser()

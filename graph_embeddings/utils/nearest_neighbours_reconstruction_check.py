@@ -8,12 +8,12 @@ def get_edge_index_embeddings(X, Y, beta):
     # fit the model
     nn.fit(Y.cpu().detach().numpy())
 
-    # Get the neighbors of Y
-    neighbors = nn.radius_neighbors(X.cpu().detach().numpy(), return_distance=False)
+    # Get elements in radius 
+    neighbors = nn.radius_neighbors(X.cpu().detach().numpy(), radius=beta.item(), return_distance=False)
 
     # Convert neighbors to a padded tensor
     # Assuming neighbors_X is a list of tensors or lists
-    neighbors_tensor = torch.nn.utils.rnn.pad_sequence([torch.tensor(neighbors, dtype=torch.long) for neighbors in neighbors], batch_first=True, padding_value=-1)
+    neighbors_tensor = torch.nn.utils.rnn.pad_sequence([torch.tensor(ns, dtype=torch.long) for ns in neighbors], batch_first=True, padding_value=-1)
 
     #  Create a tensor of source indices
     num_neighbors = neighbors_tensor.size(1)
@@ -25,13 +25,14 @@ def get_edge_index_embeddings(X, Y, beta):
     sources_filtered = sources_expanded[valid_mask]
     targets_filtered = targets_flattened[valid_mask]
 
-    # Remove self-loops
-    self_loop_mask = sources_filtered != targets_filtered
-    sources_final = sources_filtered[self_loop_mask]
-    targets_final = targets_filtered[self_loop_mask]
+    # Remove self-loops - # ! better in a final version, but it is more compatible with our codebase to add the selfloops when retrieving edge indices from dataloader
+    # self_loop_mask = sources_filtered != targets_filtered
+    # sources_final = sources_filtered[self_loop_mask]
+    # targets_final = targets_filtered[self_loop_mask]
 
     # Construct the edge index matrix
-    edge_index_from_neighbors = torch.stack((sources_final, targets_final), dim=0)
+    # edge_index_from_neighbors = torch.stack((sources_final, targets_final), dim=0)
+    edge_index_from_neighbors = torch.stack((sources_filtered, targets_filtered), dim=0)
 
     return edge_index_from_neighbors
 
@@ -44,3 +45,5 @@ def compare_edge_indices(edge_index1, edge_index2):
     common_edges = edge_set1.intersection(edge_set2)
 
     return common_edges
+
+# def compare_edge_indices()
