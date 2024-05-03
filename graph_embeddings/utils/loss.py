@@ -45,6 +45,25 @@ class HingeLoss(BaseLoss):
         self.zero = h2
         h_loss = torch.max(h1, h2).sum()
         return h_loss
+    
+
+class CaseControlHingeLoss(BaseLoss):
+    def __call__(self, 
+                preds: torch.Tensor,        # link predictions: ordered according to [links, nonlinks] as output from CaseControlDataLoader
+                num_links: int,             # number of links
+                weight_coeffs: torch.Tensor
+                ):
+        
+        h_nonlinks = 1+preds[num_links:]
+        h_links = 1-preds[:num_links]
+
+        links_zero = torch.zeros_like(h_links)
+        nonlinks_zero = torch.zeros_like(h_nonlinks)
+
+        h_loss1 = (torch.max(h_nonlinks, nonlinks_zero) * weight_coeffs).sum()
+        h_loss2 = torch.max(h_links, links_zero).sum()
+        
+        return h_loss1 + h_loss2
 
 
 class PoissonLoss(BaseLoss):

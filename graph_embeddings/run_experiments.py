@@ -2,7 +2,7 @@ import pdb
 import torch
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.models.PCAModel import PCAModel
-from graph_embeddings.utils.loss import LogisticLoss, HingeLoss, PoissonLoss, CaseControlLogisticLoss
+from graph_embeddings.utils.loss import LogisticLoss, HingeLoss, PoissonLoss, CaseControlLogisticLoss, CaseControlHingeLoss
 from graph_embeddings.utils.trainer import Trainer
 import argparse
 
@@ -63,6 +63,8 @@ def run_experiment(config: Config,
     model_types = config.get('model_types')
     loss_types = config.get('loss_types')
 
+    eval_recon_freq = config.get("eval_recon_freq") or 100
+
     for model_type in model_types:
         for loss_type in loss_types:
             print(f"# Training {model_type} model with {loss_type}...")
@@ -73,7 +75,8 @@ def run_experiment(config: Config,
             # Determine the model and loss function based on config
             model_class = {'PCA': PCAModel, 'L2': L2Model}[model_type]
             loss_fn = {"logistic": CaseControlLogisticLoss if batching_type == 'casecontrol' else LogisticLoss,
-                "hinge": HingeLoss, "poisson": PoissonLoss}[loss_type]()
+                        "hinge": CaseControlHingeLoss if batching_type=="casecontrol" else HingeLoss, 
+                        "poisson": PoissonLoss}[loss_type]()
             
             load_ckpt = config.get('load_ckpt')
             model_init = config.get('model_init') or 'random'
@@ -95,7 +98,8 @@ def run_experiment(config: Config,
                                         rank_range['max'], 
                                         lr=config.get('lr'), 
                                         early_stop_patience=config.get('early_stop_patience'), 
-                                        experiment_name=experiment_name)
+                                        experiment_name=experiment_name,
+                                        eval_recon_freq=eval_recon_freq)
                 
             # if wandb is in loggers, tag the best rank
             if wandb in loggers:
