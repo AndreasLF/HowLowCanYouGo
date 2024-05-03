@@ -7,21 +7,39 @@ experiments:
     config_path: './configs/experiments/exp3_cora.yaml'
   - name: Citeseer1
     config_path: './configs/experiments/exp1_citeseer.yaml'
+  - name: Citeseer2
+    config_path: './configs/experiments/exp2_citeseer.yaml'
   - name: Pubmed1
     config_path: './configs/experiments/exp1_pubmed.yaml'
+  - name: Pubmed2
+    config_path: './configs/experiments/exp2_pubmed.yaml'
   - name: Facebook1
     config_path: './configs/experiments/exp1_facebook.yaml'
+  - name: Facebook2
+    config_path: './configs/experiments/exp2_facebook.yaml'
   - name: ca-HepPh1
     config_path: './configs/experiments/exp1_ca-hepph.yaml'
+  - name: ca-HepPh2
+    config_path: './configs/experiments/exp2_ca-hepph.yaml'
   - name: p2p-Gnutella041
     config_path: './configs/experiments/exp1_p2p-gnutella04.yaml'
+  - name: p2p-Gnutella042
+    config_path: './configs/experiments/exp2_p2p-gnutella04.yaml'
   - name: Wiki-Vote1
     config_path: './configs/experiments/exp1_wiki-vote.yaml'
+  - name: Wiki-Vote2
+    config_path: './configs/experiments/exp2_wiki-vote.yaml'
   - name: ca-GrQc1
     config_path: './configs/experiments/exp1_ca-grqc.yaml'
+  - name: ca-GrQc2
+    config_path: './configs/experiments/exp2_ca-grqc.yaml'
   - name: email-Enron1
     config_path: './configs/experiments/exp1_email-enron.yaml'
+  - name: email-Enron2
+    config_path: './configs/experiments/exp2_email-enron.yaml'
   # Add more experiments as needed
+  - name: soc-Slashdot08112
+    config_path: './configs/experiments/exp2_soc-slashdot-0811.yaml'
 data:
   raw_path: ./data/raw
   adj_matrices_path: ./data/adj_matrices

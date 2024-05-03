@@ -3,7 +3,9 @@ dataset_ref: 'SNAPDataset/email-Enron'
 model_types: ['L2', 'PCA']
 loss_types: ['poisson', 'hinge', 'logistic']
 num_epochs: 20_000
+batch_size_percentage: 0.5
 model_init: 'random'
+batching_type: 'random'
 lr: 1.0
 early_stop_patience: 250
 rank_range:
