@@ -339,7 +339,11 @@ class Trainer:
             """
             X,Y,*_ = model.forward() # get X and Y, disregard other parameters (i.e. beta)
             svd_target = torch.concatenate([X,Y], dim=0)
-            return svd_target - svd_target.mean(dim=0).unsqueeze(0) # center svd_target -> PCA
+            # Only center if we use the L2Model
+            if model.__class__.__name__ == "L2Model":
+                return svd_target - svd_target.mean(dim=0).unsqueeze(0) # center svd_target -> PCA
+            return svd_target
+        
         svd_target = compute_svd_target(model)
 
         while lower_bound <= upper_bound:
