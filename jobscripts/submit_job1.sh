@@ -28,7 +28,7 @@ if [ "$#" -eq 3 ]; then
         exit 1
     fi
 
-    if [ "$3" != "L2" ] && [ "$3" != "PCA" ]; then
+    if [ "$3" != "L2" ] && [ "$3" != "PCA" ] && [ "$3" != "LatentEigen" ]; then
         echo "Invalid model type. Must be one of 'L2', 'PCA'"
         exit 1
     fi
