@@ -4,6 +4,7 @@ import argparse
 
 from graph_embeddings.models.PCAModel import PCAModel
 from graph_embeddings.models.L2Model import L2Model
+from graph_embeddings.models.LatentEigenModel import LatentEigenModel
 from graph_embeddings.utils.load_data import load_adj
 from graph_embeddings.utils.loss import CaseControlLogisticLoss, LogisticLoss, HingeLoss, PoissonLoss
 from graph_embeddings.utils.trainer import Trainer
@@ -20,7 +21,7 @@ from graph_embeddings.utils.config import Config
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model-type', type=str, default='PCA', choices=['PCA','L2'], help='Type of reconstruction model to use {LPCA, L2} (default: %(default)s)')
+    parser.add_argument('--model-type', type=str, default='PCA', choices=['PCA','L2','LatentEigen'], help='Type of reconstruction model to use {LPCA, L2} (default: %(default)s)')
     parser.add_argument('--loss-type', type=str, default='logistic', choices=['logistic','hinge', 'poisson'], help='Type of loss to use {logistic, hinge, poisson} (default: %(default)s)')
     parser.add_argument('--num-epochs', type=int, default=1000, metavar='N', help='number of epochs to train (default: %(default)s)')
     parser.add_argument('--rank', type=int, default=32, metavar='R', help='dimension of the embedding space (default: %(default)s)')
@@ -65,7 +66,9 @@ if __name__ == '__main__':
 
     model_init = args.model_init
 
-    model = PCAModel if args.model_type == 'PCA' else L2Model
+    model = {"PCA": PCAModel, 
+             "L2": L2Model, 
+             "LatentEigen": LatentEigenModel}[args.model_type]
     loss_fn = {"logistic": CaseControlLogisticLoss if args.batching_type == 'casecontrol' else LogisticLoss,
                "hinge": HingeLoss, 
                "poisson": PoissonLoss}[args.loss_type]()
@@ -82,5 +85,5 @@ if __name__ == '__main__':
                   model=model,
                   lr=args.lr, 
                   eval_recon_freq=10,
-                    adjust_lr_patience=20,
+                    adjust_lr_patience=None,
                   save_path=args.save_ckpt)

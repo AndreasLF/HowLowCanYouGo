@@ -10,6 +10,7 @@ from torch_geometric.utils import to_dense_adj
 
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.models.PCAModel import PCAModel
+from graph_embeddings.models.LatentEigenModel import LatentEigenModel
 from graph_embeddings.utils.load_data import load_adj
 from graph_embeddings.utils.logger import JSONLogger
 
@@ -76,7 +77,7 @@ class Trainer:
 
     def train(self, 
               rank: int, 
-              model: L2Model|PCAModel|None = None,
+              model: L2Model|PCAModel|LatentEigenModel|None = None,
               lr: float = 0.01, 
               adjust_lr_patience: float = None, 
               eval_recon_freq: int = 100, # ! evaluate full reconstruction every {x}'th epoch
@@ -219,7 +220,7 @@ class Trainer:
                 
 
                 # update progress bar
-                model_report_str = f"{model_class_name}" + (f"[beta={model.beta.item():.1f}]" if model_class_name == "L2Model" else "")
+                model_report_str = f"{model_class_name}" + (f"[beta={model.beta.item():.1f}]" if model_class_name in ["L2Model", "LatentEigenModel"] else "")
                 pbar.set_description(f"{self.dataloader.dataset_name} {loss_fn_name} {model_report_str} lr={scheduler.get_last_lr()[0]} rank={rank}, loss={epoch_loss:.1f} [@{last_recons_check_epoch or 0}:{recons_report_str or 'Ø'}]")
 
                 # Break if fully reconstructed
@@ -231,7 +232,7 @@ class Trainer:
                     print(f'Full reconstruction at epoch {epoch} with rank {rank}')
                     break
 
-                if adjust_lr_patience is not None:
+                if adjust_lr_patience is not None and epoch >= adjust_lr_patience:
                     # Early stopping condition based on loss improvement
                     if loss < best_loss:
                         best_loss = loss  # Update best loss
