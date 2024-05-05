@@ -102,8 +102,6 @@ class Batch:
         # Fill in the adjacency matrix with ones where there are edges
         A[src_idx, tgt_idx] = 1
 
-        # add 1 to diagonal
-        A.fill_diagonal_(1)
         return A
 
     @cached_property
@@ -144,8 +142,7 @@ class RandomNodeDataLoader(torch.utils.data.DataLoader):
     @cached_property
     def full_adj(self):
         A = to_dense_adj(self.data.edge_index).squeeze(0)
-        # add 1 to diagonal
-        A.fill_diagonal_(1)
+
         return A
     
     @cached_property

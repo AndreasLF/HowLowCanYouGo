@@ -54,8 +54,15 @@ class Trainer:
 
     def calc_frob_error_norm(self, logits, A):
         """Compute the Frobenius error norm between the logits and the adjacency matrix."""
+
+
         logits[logits >= self.thresh] = 1.
         logits[logits < self.thresh] = 0.
+
+        # Diagonal elements (self-loops) are not considered
+        logits.fill_diagonal_(0)
+        A.fill_diagonal_(0)
+
         frob_err = torch.linalg.norm(logits - A) / torch.linalg.norm(A)
         return frob_err
 
@@ -339,11 +346,12 @@ class Trainer:
             """
             X,Y,*_ = model.forward() # get X and Y, disregard other parameters (i.e. beta)
             svd_target = torch.concatenate([X,Y], dim=0)
+
             # Only center if we use the L2Model
             if model.__class__.__name__ == "L2Model":
                 return svd_target - svd_target.mean(dim=0).unsqueeze(0) # center svd_target -> PCA
             return svd_target
-        
+            
         svd_target = compute_svd_target(model)
 
         while lower_bound <= upper_bound:
