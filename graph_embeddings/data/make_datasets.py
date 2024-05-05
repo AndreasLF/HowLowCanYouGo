@@ -18,52 +18,51 @@ from torch_geometric.utils import coalesce
 
 
 extra_datasets = {
-    'ca-hepph': ['ca-HepPh.txt.gz'], # Add ca-HepPh dataset to available datasets.
-    'ca-grqc': ['ca-GrQc.txt.gz'], # Add ca-GrQc dataset to available datasets.
-    'ca-astroph': ['ca-AstroPh.txt.gz'],
-    'ca-condmat': ['ca-CondMat.txt.gz'],
-    'ca-hepth': ['ca-HepTh.txt.gz'],
-    'p2p-gnutella04': ['p2p-Gnutella04.txt.gz'], # Add p2p-Gnutella04 dataset to available datasets.
-    'email-enron': ['email-Enron.txt.gz'], # Add email-Enron dataset to available datasets.
-    'email-euall': ['email-EuAll.txt.gz'], # Add email-EuAll dataset to available datasets.
-    'soc-epinions1': ['soc-Epinions1.txt.gz'],
-    'soc-livejournal1': ['soc-LiveJournal1.txt.gz'],
-    'soc-pokec-relationships': ['soc-pokec-relationships.txt.gz'],
-    'soc-slashdot0811': ['soc-Slashdot0811.txt.gz'],
-    'soc-slashdot0902': ['soc-Slashdot0902.txt.gz'],
-    'com-orkut': ['bigdata/communities/com-orkut.ungraph.txt.gz'],
-    'com-youtube': ['bigdata/communities/com-youtube.ungraph.txt.gz'],
-    'com-dblp': ['bigdata/communities/com-dblp.ungraph.txt.gz'],
-    'com-amazon': ['bigdata/communities/com-amazon.ungraph.txt.gz'],
-    'wiki-talk': ['wiki-Talk.txt.gz'],
-    'cit-hepph': ['cit-HepPh.txt.gz'],
-    'cit-hepth': ['cit-HepTh.txt.gz'],
-    'cit-patents': ['cit-Patents.txt.gz'],
-    'web-berkstan': ['web-BerkStan.txt.gz'],
-    'web-google': ['web-Google.txt.gz'],
-    'web-notredame': ['web-NotreDame.txt.gz'],
-    'web-stanford': ['web-Stanford.txt.gz'],
-    'amazon0302': ['amazon0302.txt.gz'],
-    'amazon0312': ['amazon0312.txt.gz'],
-    'amazon0505': ['amazon0505.txt.gz'],
-    'amazon0601': ['amazon0601.txt.gz'],
-    'p2p-gnutella04': ['p2p-Gnutella04.txt.gz'],
-    'p2p-gnutella05': ['p2p-Gnutella05.txt.gz'],
-    'p2p-gnutella06': ['p2p-Gnutella06.txt.gz'],
-    'p2p-gnutella08': ['p2p-Gnutella08.txt.gz'],
-    'p2p-gnutella09': ['p2p-Gnutella09.txt.gz'],
-    'p2p-gnutella24': ['p2p-Gnutella24.txt.gz'],
-    'p2p-gnutella25': ['p2p-Gnutella25.txt.gz'],
-    'p2p-gnutella30': ['p2p-Gnutella30.txt.gz'],
-    'p2p-gnutella31': ['p2p-Gnutella31.txt.gz'],
-    'roadnet-ca': ['roadNet-CA.txt.gz'],
-    'roadnet-pa': ['roadNet-PA.txt.gz'],
-    'roadnet-tx': ['roadNet-TX.txt.gz'],
-    'as-733': ['as20000102.txt.gz'],
-    'as-skitter': ['as-skitter.txt.gz'],
-    'as-caida': ['as-caida20071105.txt.gz'],
-    'loc-gowalla': ['loc-gowalla_edges.txt.gz'],
-    'loc-brightkite': ['loc-brightkite_edges.txt.gz']
+    'ca-hepph': ['ca-HepPh.txt.gz'], # Nodes: 12,008
+    'ca-grqc': ['ca-GrQc.txt.gz'], # Nodes: 5,242
+    'ca-astroph': ['ca-AstroPh.txt.gz'], # Nodes: 18,772
+    'ca-condmat': ['ca-CondMat.txt.gz'], # Nodes: 23,133
+    'ca-hepth': ['ca-HepTh.txt.gz'], # Nodes: 9,877
+    'email-enron': ['email-Enron.txt.gz'], # Nodes: 36,692
+    'email-euall': ['email-EuAll.txt.gz'], # Nodes: 265,214
+    'soc-epinions1': ['soc-Epinions1.txt.gz'], # Nodes: 75,879
+    'soc-livejournal1': ['soc-LiveJournal1.txt.gz'], # Nodes: 4,847,571
+    'soc-pokec-relationships': ['soc-pokec-relationships.txt.gz'], # Nodes: 1,632,803
+    'soc-slashdot0811': ['soc-Slashdot0811.txt.gz'], # Nodes: 77,360
+    'soc-slashdot0902': ['soc-Slashdot0902.txt.gz'], # Nodes: 82,168
+    'com-orkut': ['bigdata/communities/com-orkut.ungraph.txt.gz'], # Nodes: 3,072,441
+    'com-youtube': ['bigdata/communities/com-youtube.ungraph.txt.gz'], # Nodes: 1,134,890
+    'com-dblp': ['bigdata/communities/com-dblp.ungraph.txt.gz'], # Nodes: 317,080
+    'com-amazon': ['bigdata/communities/com-amazon.ungraph.txt.gz'], # Nodes: 334,863
+    'wiki-talk': ['wiki-Talk.txt.gz'], # Nodes: 2,394,385
+    'cit-hepph': ['cit-HepPh.txt.gz'], # Nodes: 34,546
+    'cit-hepth': ['cit-HepTh.txt.gz'], # Nodes: 27,770
+    'cit-patents': ['cit-Patents.txt.gz'], # Nodes: 3,774,768
+    'web-berkstan': ['web-BerkStan.txt.gz'], # Nodes: 685,230
+    'web-google': ['web-Google.txt.gz'], # Nodes: 875,713
+    'web-notredame': ['web-NotreDame.txt.gz'], # Nodes: 325,729
+    'web-stanford': ['web-Stanford.txt.gz'], # Nodes: 281,903
+    'amazon0302': ['amazon0302.txt.gz'], # Nodes: 262,111
+    'amazon0312': ['amazon0312.txt.gz'], # Nodes: 400,727
+    'amazon0505': ['amazon0505.txt.gz'], # Nodes: 410,236
+    'amazon0601': ['amazon0601.txt.gz'], # Nodes: 403,394
+    'p2p-gnutella04': ['p2p-Gnutella04.txt.gz'], # Nodes: 10,876
+    'p2p-gnutella05': ['p2p-Gnutella05.txt.gz'], # Nodes: 8,846
+    'p2p-gnutella06': ['p2p-Gnutella06.txt.gz'], # Nodes: 8,717
+    'p2p-gnutella08': ['p2p-Gnutella08.txt.gz'], # Nodes: 6,301
+    'p2p-gnutella09': ['p2p-Gnutella09.txt.gz'], # Nodes: 8,114
+    'p2p-gnutella24': ['p2p-Gnutella24.txt.gz'], # Nodes: 26,518
+    'p2p-gnutella25': ['p2p-Gnutella25.txt.gz'], # Nodes: 22,687
+    'p2p-gnutella30': ['p2p-Gnutella30.txt.gz'], # Nodes: 36,682
+    'p2p-gnutella31': ['p2p-Gnutella31.txt.gz'], # Nodes: 62,586
+    'roadnet-ca': ['roadNet-CA.txt.gz'], # Nodes: 1,965,206
+    'roadnet-pa': ['roadNet-PA.txt.gz'], # Nodes: 1,088,092
+    'roadnet-tx': ['roadNet-TX.txt.gz'], # Nodes: 1,379,917
+    'as-733': ['as20000102.txt.gz'], # Nodes: 103-6,474
+    'as-skitter': ['as-skitter.txt.gz'], # Nodes: 1,696,415
+    'as-caida': ['as-caida20071105.txt.gz'], # Nodes: 8,020-26,475
+    'loc-gowalla': ['loc-gowalla_edges.txt.gz'], # Nodes: 196,591
+    'loc-brightkite': ['loc-brightkite_edges.txt.gz'] # Nodes: 58,228
     }
 
 # Monekypatch: Add the datasets to the available datasets in SNAPDataset

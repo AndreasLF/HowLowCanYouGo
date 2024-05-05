@@ -313,7 +313,8 @@ class Trainer:
                           lr: float = 0.01,
                           early_stop_patience=None, 
                           experiment_name=None, 
-                          results_folder='results'):
+                          results_folder='results',
+                          eval_recon_freq=100):
         """
         Find the optimal rank for the model by starting on a 
             high guess (i.e. upper bound) at the optimal rank, followed 
@@ -337,7 +338,7 @@ class Trainer:
         save_path = None # ! just ignore initial model
         model = self.init_model(rank=max_rank)
         if self.model_init != 'load':
-            self.train(max_rank, model=model, lr=lr, adjust_lr_patience=early_stop_patience, save_path=save_path)
+            self.train(max_rank, model=model, lr=lr, adjust_lr_patience=early_stop_patience, save_path=save_path, eval_recon_freq=eval_recon_freq)
         
         def compute_svd_target(model):
             """
@@ -374,7 +375,8 @@ class Trainer:
                                model=model, 
                                lr=lr, 
                                adjust_lr_patience=early_stop_patience, 
-                               save_path=save_path)
+                               save_path=save_path,
+                               eval_recon_freq=eval_recon_freq)
 
             # Check if the reconstruction is within the threshold
             if is_fully_reconstructed:
