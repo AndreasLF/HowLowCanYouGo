@@ -77,5 +77,5 @@ class LatentEigenModel(nn.Module):
 
     def forward(self):
         if self.S is not None: # during pretraining, i.e. SVD target
-            return self.beta, self.X, self.Y, self.S
-        return self.beta, self.X, self.Y
+            return self.X, self.Y, self.S, self.beta
+        return self.X, self.Y, self.beta
