@@ -2,6 +2,7 @@ import pdb
 import torch
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.models.PCAModel import PCAModel
+from graph_embeddings.models.LatentEigenModel import LatentEigenModel
 from graph_embeddings.utils.loss import LogisticLoss, HingeLoss, PoissonLoss, CaseControlLogisticLoss, CaseControlHingeLoss
 from graph_embeddings.utils.trainer import Trainer
 import argparse
@@ -73,7 +74,9 @@ def run_experiment(config: Config,
 
 
             # Determine the model and loss function based on config
-            model_class = {'PCA': PCAModel, 'L2': L2Model}[model_type]
+            model_class = {'PCA': PCAModel, 
+                           'L2': L2Model, 
+                           'LatentEigen': LatentEigenModel}[model_type]
             loss_fn = {"logistic": CaseControlLogisticLoss if batching_type == 'casecontrol' else LogisticLoss,
                         "hinge": CaseControlHingeLoss if batching_type=="casecontrol" else HingeLoss, 
                         "poisson": PoissonLoss}[loss_type]()
