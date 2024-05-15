@@ -283,7 +283,7 @@ def check_reconctruction(edges,Z,W,beta,N1,N2):
    # node_j=torch.arange(N2)
     
     
-    tree = KDTree(X, leaf_size=4*np.log(N1))              
+    tree = KDTree(X, leaf_size=int(4*np.log(N1)))
     counts= tree.query_radius(X, r=beta_np,count_only=True)  
     indeces=tree.query_radius(X, r=beta_np)  
 
@@ -341,30 +341,15 @@ def check_reconctruction_analytical(edges,Z,W,beta,N1,N2):
 def create_model(dataset, latent_dim, link_function = "SOFTPLUS"):
     # Available choices for link_function are ['EXP','SOFTPLUS']
     # ! if we use full adj matrix, do not concatenate i->j, j->i
-    sparse_i_=pd.read_csv('./'+dataset+'/sparse_i.txt')
-    sparse_j_=pd.read_csv('./'+dataset+'/sparse_j.txt')
-
-    sparse_i=torch.cat((torch.tensor(sparse_i_.values.reshape(-1),device=device).long(),torch.tensor(sparse_j_.values.reshape(-1),device=device).long()))       
-    sparse_j=torch.cat((torch.tensor(sparse_j_.values.reshape(-1),device=device).long(),torch.tensor(sparse_i_.values.reshape(-1),device=device).long()))
-    del sparse_i_
-    del sparse_j_
-    edges=torch.cat((sparse_i.unsqueeze(1),sparse_j.unsqueeze(1)),1).T
-
-
-    sparse_i_rem=sparse_i#torch.from_numpy(np.loadtxt('./'+dataset+'/sparse_i_rem.txt')).long().to(device)
-    sparse_j_rem=sparse_j#torch.from_numpy(np.loadtxt('./'+dataset+'/sparse_j_rem.txt')).long().to(device)
-    non_sparse_i=torch.from_numpy(np.loadtxt('./'+dataset+'/non_sparse_i.txt')).long().to(device)
-    non_sparse_j=torch.from_numpy(np.loadtxt('./'+dataset+'/non_sparse_j.txt')).long().to(device)
+    sparse_i = torch.load(f'./{dataset}/sparse_i.pt')
+    sparse_j = torch.load(f'./{dataset}/sparse_j.pt')
+    edges=torch.vstack([sparse_i,sparse_j])
     
-
     N1=int(sparse_i.max()+1)
     N2=int(sparse_j.max()+1)
-    #adj=torch.zeros(N1,N2)
-    #adj[sparse_i,sparse_j]=1
-    #non_sparse_i,non_sparse_j=torch.where(adj==0)
 
-    model = LSM(link_function,sparse_i,sparse_j,N1,N2,latent_dim=latent_dim,non_sparse_i=non_sparse_i,non_sparse_j=non_sparse_j,sparse_i_rem=sparse_i_rem,sparse_j_rem=sparse_j_rem,CVflag=True,graph_type='undirected',missing_data=False).to(device)    
-    #model.load_state_dict(torch.load(f'EE_model_{model}_{dataset}.pth'))
+    model = LSM(link_function,sparse_i,sparse_j,N1,N2,latent_dim=latent_dim,CVflag=True,graph_type='directed',missing_data=False).to(device)    
+    # model = LSM(link_function,sparse_i,sparse_j,N1,N2,latent_dim=latent_dim,non_sparse_i=non_sparse_i,non_sparse_j=non_sparse_j,sparse_i_rem=sparse_i_rem,sparse_j_rem=sparse_j_rem,CVflag=True,graph_type='undirected',missing_data=False).to(device)    
     return model, N1, N2, edges
 
 
@@ -377,86 +362,77 @@ def train(model,
           N2,
           edges,
           exp_id = None,
-          phase_epochs = {1: 1_000, 2: 5_000, 3: 10_000},
+          phase_epochs = {1: 1_00, 2: 5_000, 3: 10_000},
           kd_tree_freq = 5):
     torch.autograd.set_detect_anomaly(True)
 
-    rocs=[]
-    prs=[]
-    for cv_split in range(1):
-        print(dataset)
-        losses=[]
-        ROC=[]
-        PR=[]
-        zetas=[]
-        betas=[]
-        scalings=[]
-        num_of_el=[]
-        num_of_ep=[]
-        per_of_el=[]
+
+    num_of_el=[]
+    num_of_ep=[]
+    per_of_el=[]
 
 # ################################################################################################################################################################
 # ################################################################################################################################################################
 # ################################################################################################################################################################
-        
-        optimizer = optim.Adam(model.parameters(), 0.1)  
     
-        model.scaling=0
-        print('PHASE 1: Running HBDM for 1000 iterations')
-        pbar = tqdm(range(phase_epochs[2] + 1))
-        for epoch in pbar:
-            if epoch < phase_epochs[1]:
+    optimizer = optim.Adam(model.parameters(), 0.1)  
+
+    model.scaling=0
+    print(f'PHASE 1: Running HBDM for {phase_epochs[1]} iterations')
+    pbar = tqdm(range(phase_epochs[2] + 1))
+    for epoch in pbar:
+        if epoch < phase_epochs[1]:
+            loss = -model.LSM_likelihood_bias(epoch=epoch) / N1
+            optimizer.zero_grad()  # clear the gradients.   
+            loss.backward()  # backpropagate
+            optimizer.step()  # update the weights
+        else:
+            if epoch == phase_epochs[1]:
+                print('PHASE 2: Running HBDM and Hinge loss, for every HBDM iteration running {kd_tree_freq} iterations for the hinge loss')
+
+            if epoch % 2 == 0:
                 loss = -model.LSM_likelihood_bias(epoch=epoch) / N1
                 optimizer.zero_grad()  # clear the gradients.   
                 loss.backward()  # backpropagate
                 optimizer.step()  # update the weights
             else:
-                if epoch == phase_epochs[1]:
-                    print('PHASE 2: Running HBDM and Hinge loss, for every HBDM iteration running 5 iterations for the hinge loss')
+                percentage, num_elements, active = check_reconctruction(edges, model.latent_z, model.latent_w, model.bias, N1, N2)
+                i_link, j_link = active.indices()[:, active.values() == 1]
+                i_non_link, j_non_link = active.indices()[:, active.values() == -1]
+                mask = i_non_link != j_non_link
+                i_non_link = i_non_link[mask]
+                j_non_link = j_non_link[mask]
 
-                if epoch % 2 == 0:
-                    loss = -model.LSM_likelihood_bias(epoch=epoch) / N1
-                    optimizer.zero_grad()  # clear the gradients.   
+                if num_elements == 0:
+                    torch.save(model.state_dict(), 'EE_model.pth')
+                    print('Total reconstruction achieved')
+                    return True
+
+                for j in range(5):
+                    loss = -model.final_analytical(i_link, j_link, i_non_link, j_non_link, hinge=True) / N1
+                    optimizer.zero_grad()  # clear the gradients.
                     loss.backward()  # backpropagate
                     optimizer.step()  # update the weights
-                else:
+
+            pbar.set_description(f"Loss={loss.item():.4f}")
+            if epoch % 100 == 0:
+
+                if epoch > 400:
                     percentage, num_elements, active = check_reconctruction(edges, model.latent_z, model.latent_w, model.bias, N1, N2)
-                    i_link, j_link = active.indices()[:, active.values() == 1]
-                    i_non_link, j_non_link = active.indices()[:, active.values() == -1]
-                    mask = i_non_link != j_non_link
-                    i_non_link = i_non_link[mask]
-                    j_non_link = j_non_link[mask]
+                    print(f'Miss-classified percentage of total elements: {100 * percentage}%, i.e. {num_elements} elements',)
+                    print(f'compared to nlogn, i.e. {num_elements / (N1 * np.log(N1))} elements',)
 
-                    if num_elements == 0:
-                        torch.save(model.state_dict(), 'EE_model.pth')
-                        print('Total reconstruction achieved')
-                        break
-
-                    for j in range(5):
-                        loss = -model.final_analytical(i_link, j_link, i_non_link, j_non_link, hinge=True) / N1
-                        optimizer.zero_grad()  # clear the gradients.
-                        loss.backward()  # backpropagate
-                        optimizer.step()  # update the weights
-
-                pbar.set_description(f"Loss={torch.round(loss, decimals=4).item()}")
-                if epoch % 100 == 0:
-
-                    if epoch > 400:
-                        percentage, num_elements, active = check_reconctruction(edges, model.latent_z, model.latent_w, model.bias, N1, N2)
-                        print(f'Miss-classified percentage of total elements: {100 * percentage}%, i.e. {num_elements} elements',)
-                        print(f'compared to nlogn, i.e. {num_elements / (N1 * np.log(N1))} elements',)
-
-                        num_of_el.append(num_elements.numpy())
-                        num_of_ep.append(epoch)
-                        per_of_el.append(100 * percentage.numpy())
-                        plt.title('Number of elements')
-                        plt.plot(num_of_ep, num_of_el)
-                        plt.xlabel('epoch')
-                        plt.show()
-                        plt.title('% of total elements')
-                        plt.plot(num_of_ep, per_of_el)
-                        plt.xlabel('epoch')
-                        plt.show()
+                    num_of_el.append(num_elements.numpy())
+                    num_of_ep.append(epoch)
+                    per_of_el.append(100 * percentage.numpy())
+                    plt.title('Number of elements')
+                    plt.plot(num_of_ep, num_of_el)
+                    plt.xlabel('epoch')
+                    plt.show()
+                    plt.title('% of total elements')
+                    plt.plot(num_of_ep, per_of_el)
+                    plt.xlabel('epoch')
+                    plt.show()
                 
     print(f'PHASE 3: Running Hinge loss only (building kdtree every {kd_tree_freq} iterations)')
 
@@ -484,10 +460,10 @@ def train(model,
         optimizer.step() # update the weights
         
         # scheduler.step()
-        if epoch%5==0: # ! evalute every 5 or 25? etc.
+        if epoch%kd_tree_freq==0: # ! evalute every 5 or 25? etc.
             print(loss.item())
             print(epoch)
-            if epoch%5==0:
+            if epoch%kd_tree_freq==0:
                 percentage,num_elements,active=check_reconctruction(edges,model.latent_z,model.latent_w,model.bias,N1,N2)
                 i_link,j_link=active.indices()[:,active.values()==1]
 
