@@ -376,6 +376,7 @@ def train(model,
           N1,
           N2,
           edges,
+          exp_id = None,
           phase_epochs = {1: 1_000, 2: 5_000, 3: 10_000},
           kd_tree_freq = 5):
     torch.autograd.set_detect_anomaly(True)
@@ -402,7 +403,8 @@ def train(model,
     
         model.scaling=0
         print('PHASE 1: Running HBDM for 1000 iterations')
-        for epoch in tqdm(range(phase_epochs[2] + 1), desc="Training Epochs"):
+        pbar = tqdm(range(phase_epochs[2] + 1))
+        for epoch in pbar:
             if epoch < phase_epochs[1]:
                 loss = -model.LSM_likelihood_bias(epoch=epoch) / N1
                 optimizer.zero_grad()  # clear the gradients.   
@@ -436,9 +438,8 @@ def train(model,
                         loss.backward()  # backpropagate
                         optimizer.step()  # update the weights
 
+                pbar.set_description(f"Loss={torch.round(loss, decimals=4).item()}")
                 if epoch % 100 == 0:
-                    print(loss.item())
-                    print(epoch)
 
                     if epoch > 400:
                         percentage, num_elements, active = check_reconctruction(edges, model.latent_z, model.latent_w, model.bias, N1, N2)
@@ -499,7 +500,7 @@ def train(model,
                 if num_elements==0:
                     torch.save(model.state_dict(), f'EE_model_{model}_{dataset}.pth')
                     print('Total reconstruction achieved')
-                    return model
+                    return True
                 
             if epoch%10:
                 num_of_el.append(num_elements.numpy())
@@ -517,12 +518,12 @@ def train(model,
                 plt.xlabel('epoch')
                 plt.show()
     
-    return None
+    return False
             
             
 if __name__ == '__main__':
     latent_dim = 50
     dataset = 'cora'
     model, N1, N2, edges = create_model(dataset, latent_dim)
-    model = train(model, N1, N2, edges)
+    is_reconstructed = train(model, N1, N2, edges)
     pdb.set_trace()            
