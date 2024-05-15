@@ -6,8 +6,8 @@ if __name__ == "__main__":
     raw_path = "data/raw"
     os.makedirs(raw_path, exist_ok=True)
 
-    dataset_name = "Cora"
-    paper = "Planetoid"
+    dataset_name = "ca-GrQc"
+    paper = "SNAPDataset"
     dataset = get_data_from_torch_geometric(paper, dataset_name, raw_path)
     data = dataset[0]
     edge_index = data.edge_index
@@ -20,5 +20,3 @@ if __name__ == "__main__":
 
     torch.save(edge_index[0], save_path + "/sparse_i.pt")
     torch.save(edge_index[1], save_path + "/sparse_j.pt")
-
-
