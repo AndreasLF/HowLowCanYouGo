@@ -2,16 +2,18 @@ import torch
 from main import create_model
 from main import train
 import uuid
+import os
 
 
-def make_model_save_path(dataset, rank, full_reconstruct):
+def make_model_save_path(dataset, rank, full_reconstruct, results_folder="results"):
+
+    os.makedirs(results_folder, exist_ok=True)
 
     uid = str(uuid.uuid4())
-
     if full_reconstruct:
-        return f"EE_model_LSM_{dataset}_{rank}_FR_{uid}.pt"
+        return f"{results_folder}/EE_model_LSM_{dataset}_{rank}_FR_{uid}.pt"
     else:
-        return f"EE_model_LSM_{dataset}_{rank}_{uid}.pt"
+        return f"{results_folder}/EE_model_LSM_{dataset}_{rank}_{uid}.pt"
 
 
 def find_optimal_rank(min_rank: int, 
@@ -33,7 +35,6 @@ def find_optimal_rank(min_rank: int,
     
     """
 
-    # !TODO make exp_id and pass to train function for logging to wandb
     exp_id = str(uuid.uuid4())
 
     lower_bound = min_rank
@@ -61,7 +62,8 @@ def find_optimal_rank(min_rank: int,
     print(f'Training FIRST model with rank {upper_bound}')
     model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=upper_bound, device=device)
     is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id)
-    save_path = make_model_save_path(dataset, upper_bound, is_fully_reconstructed)
+    save_path = make_model_save_path(dataset=dataset, rank=upper_bound,
+                                     full_reconstruct=is_fully_reconstructed, results_folder=results_folder)
     torch.save(model, save_path)
 
     if is_fully_reconstructed:
@@ -82,7 +84,8 @@ def find_optimal_rank(min_rank: int,
         model.latent_w = Y
 
         is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id)
-        save_path = make_model_save_path(dataset, current_rank, is_fully_reconstructed)
+        save_path = make_model_save_path(dataset=dataset, rank=current_rank, 
+                                         full_reconstruct=is_fully_reconstructed, results_folder=results_folder)
         torch.save(model, save_path)
 
         # Check if the reconstruction is within the threshold
@@ -102,7 +105,20 @@ def find_optimal_rank(min_rank: int,
 
 
 if __name__ == "__main__":
-    device = 'cuda'
+
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--device', type=str, default='cpu')
+    parser.add_argument("--dataset", type=str, default='Cora', help="Dataset to run experiment for")
+    parser.add_argument("--max", type=int, default=100, help="Max rank to search for")
+    parser.add_argument("--min", type=int, default=1, help="Max rank to search for")
+
+    args = parser.parse_args()
+    device = args.device
+
+    dataset = args.dataset
+
     dataset_relpath = "datasets"
     # find_optimal_rank(3,100,f"{dataset_relpath}/Cora")
-    find_optimal_rank(1,5,f"{dataset_relpath}/Cora", device=device)
+    find_optimal_rank(args.min,args.max,f"{dataset_relpath}/{dataset}", device=device)
+
