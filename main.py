@@ -400,7 +400,7 @@ def train(model,
         metrics = {'epoch': epoch}
 
         if epoch % 1_000 == 0 and epoch != 0 and search_state is not None:
-            os.mkdirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
+            os.makedirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
             search_state['current_model'] = model.state_dict()
             torch.save(search_state, f'checkpoints/{dataset_name}_{exp_id}/EE_model_{epoch}.ckpt') # EED search state
 
@@ -477,7 +477,7 @@ def train(model,
         metrics = {"epoch": phase_epochs[2] + epoch + 1}
 
         if epoch % 1_000 == 0 and epoch != 0 and search_state is not None:
-            os.mkdirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
+            os.makedirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
             search_state['current_model'] = model.state_dict()
             torch.save(search_state, f'checkpoints/{dataset_name}_{exp_id}/EE_model_{epoch}.ckpt') # EED search state
                         
