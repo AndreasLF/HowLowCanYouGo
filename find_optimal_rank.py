@@ -57,46 +57,74 @@ def find_optimal_rank(min_rank: int,
         # Center
         return svd_target - svd_target.mean(dim=0).unsqueeze(0) # center svd_target -> PCA
 
-    model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=upper_bound, device=device)
+    
 
-    if load_ckpt:
+    if load_ckpt is not None:
+        # TODO change to loading search state
+        search_state = torch.load(load_ckpt)
+
         # ! ensure that embedding dims in {model}.pt-file match max_rank params
         print(f'Initializing FIRST model from {load_ckpt}')
-        _loaded = torch.load(load_ckpt)
-        _loaded = _loaded.state_dict() if _loaded.__class__.__name__ == 'LSM' else _loaded # assume _loaded contains state dict if it is not an LSM instance
-        model.load_state_dict()
-        del _loaded
+        lower_bound = search_state['lb']
+        upper_bound = search_state['ub']
+        current_rank = search_state['cur_rank']
+        model = create_model(dataset=dataset, latent_dim=current_rank, device=device)
+        model.load_state_dict(search_state['current_model'])
+
+        full_recon_model, N1, N2, edges = create_model(dataset=dataset, latent_dim=upper_bound, device=device)
+        full_recon_model.load_state_dict(search_state['full_recon_model'])
+
+        svd_target = compute_svd_target(full_recon_model)
     else:
+        model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=upper_bound, device=device)
         print(f'Training FIRST model with rank {upper_bound}')
+        search_state = {'lb': lower_bound, 'ub': upper_bound, 'full_recon_model': None}
         save_path = make_model_save_path(dataset=dataset_name, rank=upper_bound, results_folder=results_folder, exp_id=exp_id)
         is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, phase_epochs=phase_epochs, dataset_name=dataset_name, model_path=save_path, wandb_logging=wandb_logging)
         torch.save(model, save_path)
+        
+        svd_target = svd_target or compute_svd_target(model)
 
     if is_fully_reconstructed:
         print("Full reconstruction not found with random initialization")
         return -1 # ! -1 <=> no rank found
 
-    svd_target = compute_svd_target(model)
 
     while lower_bound <= upper_bound:
-        current_rank = (lower_bound + upper_bound) // 2
+        if load_ckpt is None:
+            current_rank = (lower_bound + upper_bound) // 2
+
+            # 2. Perform SVD estimate from higher into lower rank approx.
+            _,_,V = torch.svd_lowrank(svd_target, q=current_rank)
+            X,Y = torch.chunk(svd_target, 2, dim=0)
+            model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=current_rank, device=device)
+            model.latent_z = torch.nn.Parameter(X@V, requires_grad=True)
+            model.latent_w = torch.nn.Parameter(Y@V, requires_grad=True)
+
+            del X; del Y; del V; del _;
+
+        load_ckpt = None # set load_ckpt to None for enabling SVD for next iterations
+ 
         print(f'Training model (SVD initialized) with rank {current_rank}')
 
-        # 2. Perform SVD estimate from higher into lower rank approx.
-        _,_,V = torch.svd_lowrank(svd_target, q=current_rank)
-        X,Y = torch.chunk(svd_target, 2, dim=0)
-        model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=current_rank, device=device)
-        model.latent_z = torch.nn.Parameter(X@V, requires_grad=True)
-        model.latent_w = torch.nn.Parameter(Y@V, requires_grad=True)
-
-        del X; del Y; del V; del _;
+        search_state['cur_rank'] = current_rank
+        search_state['lb'] = lower_bound
+        search_state['ub'] = upper_bound
 
         save_path = make_model_save_path(dataset=dataset_name, rank=current_rank,results_folder=results_folder, exp_id=exp_id)
-        is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, phase_epochs=phase_epochs, dataset_name=dataset_name, model_path=save_path, wandb_logging=wandb_logging)
+        is_fully_reconstructed = train(model, N1, N2, edges, 
+                                       exp_id=exp_id, 
+                                       phase_epochs=phase_epochs, 
+                                       dataset_name=dataset_name, 
+                                       model_path=save_path, 
+                                       wandb_logging=wandb_logging,
+                                       search_state=search_state)
         torch.save(model, save_path)
 
         # Check if the reconstruction is within the threshold
         if is_fully_reconstructed:
+            search_state['full_recon_model'] = model.state_dict() # save in search state
+
             print(f'Full reconstruction at rank {current_rank}\n')
             optimal_rank = current_rank  # Update the optimal rank if reconstruction is within the threshold
             upper_bound = current_rank - 1  # Try to find a smaller rank

@@ -364,7 +364,9 @@ def train(model,
           learning_rate_hinge = 0.1,
           dataset_name = None,
           model_path = "notset",
-          wandb_logging = True):
+          wandb_logging = True,
+          search_state = None
+          ):
     torch.autograd.set_detect_anomaly(True)
 
     rank = model.latent_dim
@@ -397,9 +399,10 @@ def train(model,
     for epoch in pbar:
         metrics = {'epoch': epoch}
 
-        if epoch % 1_000 == 0 and epoch != 0:
+        if epoch % 1_000 == 0 and epoch != 0 and search_state is not None:
             os.mkdirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
-            torch.save(model.state_dict(), f'checkpoints/{dataset_name}_{exp_id}/EE_model_{epoch}.ckpt') # state-dict
+            search_state['current_model'] = model.state_dict()
+            torch.save(search_state, f'checkpoints/{dataset_name}_{exp_id}/EE_model_{epoch}.ckpt') # EED search state
 
         if epoch < phase_epochs[1]: # ! PHASE 1
             loss = -model.LSM_likelihood_bias(epoch=epoch) / N1
@@ -473,10 +476,10 @@ def train(model,
     for epoch in pbar:
         metrics = {"epoch": phase_epochs[2] + epoch + 1}
 
-        if epoch % 1_000 == 0 and epoch != 0:
-            os_mkdirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
-            total_epochs = epoch + phase_epochs[2] # save ckpt with total epochs (phase1-, phase2- and phase3-epochs) - currently, phase2 epochs contains both phase1 and phase2  
-            torch.save(model.state_dict(), f'checkpoints/{dataset_name}_{exp_id}/EE_model_{total_epochs}.ckpt') # state-dict
+        if epoch % 1_000 == 0 and epoch != 0 and search_state is not None:
+            os.mkdirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
+            search_state['current_model'] = model.state_dict()
+            torch.save(search_state, f'checkpoints/{dataset_name}_{exp_id}/EE_model_{epoch}.ckpt') # EED search state
                         
         loss=-model.final_analytical(i_link, j_link, i_non_link, j_non_link)/N1
         last_hinge_loss = loss.detach().cpu().item()
