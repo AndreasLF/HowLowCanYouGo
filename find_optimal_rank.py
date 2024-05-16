@@ -53,7 +53,7 @@ def find_optimal_rank(min_rank: int,
         """
         X = model.latent_z
         Y = model.latent_w
-        svd_target = torch.concatenate([X,Y], dim=0)
+        svd_target = torch.vstack([X,Y])
         # Center
         return svd_target - svd_target.mean(dim=0).unsqueeze(0) # center svd_target -> PCA
 
@@ -77,9 +77,9 @@ def find_optimal_rank(min_rank: int,
         # 2. Perform SVD estimate from higher into lower rank approx.
         _,_,V = torch.svd_lowrank(svd_target, q=current_rank)
         X,Y = torch.chunk(svd_target, 2, dim=0)
-        model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=current_rank)
-        model.latent_z = X
-        model.latent_w = Y
+        model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=current_rank, device=device)
+        model.latent_z = torch.nn.Parameter(X@V, requires_grad=True)
+        model.latent_w = torch.nn.Parameter(Y@V, requires_grad=True)
 
         is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id)
         save_path = make_model_save_path(dataset, current_rank, is_fully_reconstructed)
@@ -104,5 +104,4 @@ def find_optimal_rank(min_rank: int,
 if __name__ == "__main__":
     device = 'cuda'
     dataset_relpath = "datasets"
-    # find_optimal_rank(3,100,f"{dataset_relpath}/Cora")
-    find_optimal_rank(1,5,f"{dataset_relpath}/Cora", device=device)
+    find_optimal_rank(1, 2, dataset=f"{dataset_relpath}/Cora", device=device)

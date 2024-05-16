@@ -364,7 +364,7 @@ def train(model,
           N2,
           edges,
           exp_id = None,
-          phase_epochs = {1: 1_0, 2: 5_0, 3: 10_0},
+          phase_epochs = {1: 1, 2: 5, 3: 10},
           kd_tree_freq = 5):
     torch.autograd.set_detect_anomaly(True)
 
@@ -381,6 +381,7 @@ def train(model,
 
     model.scaling=0
     print(f'PHASE 1: Running HBDM for {phase_epochs[1]} iterations')
+    phase_str = "PHASE 1"
     pbar = tqdm(range(phase_epochs[2] + 1))
     for epoch in pbar:
         if epoch < phase_epochs[1]:
@@ -391,6 +392,7 @@ def train(model,
         else:
             if epoch == phase_epochs[1]:
                 print('PHASE 2: Running HBDM and Hinge loss, for every HBDM iteration running {kd_tree_freq} iterations for the hinge loss')
+                phase_str = "PHASE 2"
 
             if epoch % 2 == 0:
                 loss = -model.LSM_likelihood_bias(epoch=epoch) / N1
@@ -416,7 +418,6 @@ def train(model,
                     loss.backward()  # backpropagate
                     optimizer.step()  # update the weights
 
-            pbar.set_description(f"Loss={loss.item():.4f}")
             if epoch % 100 == 0:
 
                 if epoch > 400:
@@ -427,16 +428,18 @@ def train(model,
                     num_of_el.append(num_elements.numpy())
                     num_of_ep.append(epoch)
                     per_of_el.append(100 * percentage.numpy())
-                    plt.title('Number of elements')
-                    plt.plot(num_of_ep, num_of_el)
-                    plt.xlabel('epoch')
-                    plt.show()
-                    plt.title('% of total elements')
-                    plt.plot(num_of_ep, per_of_el)
-                    plt.xlabel('epoch')
-                    plt.show()
+                    # ! plt.title('Number of elements')
+                    # ! plt.plot(num_of_ep, num_of_el)
+                    # ! plt.xlabel('epoch')
+                    # ! plt.show()
+                    # ! plt.title('% of total elements')
+                    # ! plt.plot(num_of_ep, per_of_el)
+                    # ! plt.xlabel('epoch')
+                    # ! plt.show()
+        pbar.set_description(f"{phase_str} Loss={loss.item():.4f}")
                 
     print(f'PHASE 3: Running Hinge loss only (building kdtree every {kd_tree_freq} iterations)')
+    phase_str = "PHASE 3"
 
     percentage,num_elements,active=check_reconctruction(edges,model.latent_z,model.latent_w,model.bias,N1,N2)
     print(f'Miss-classified percentage of total elements: {100*percentage}%, i.e. {num_elements} elements',)
@@ -453,7 +456,8 @@ def train(model,
     per_of_el=[]
 
 
-    for epoch in range(phase_epochs[3]):
+    pbar = tqdm(range(phase_epochs[3] + 1))
+    for epoch in pbar:
                         
         loss=-model.final_analytical(i_link, j_link, i_non_link, j_non_link)/N1
     
@@ -487,14 +491,15 @@ def train(model,
                 #percentage,num_elements=check_reconctruction_analytical(edges,model.latent_z,model.latent_w,model.bias,N1,N2)
                 #print(f'Miss-classified percentage of total elements: {percentage} %, i.e. {num_elements} number of elements',)
                 #roc,pr=model.link_prediction() #perfom link prediction and return auc-roc, auc-pr
-                plt.title('Number of elements')
-                plt.plot(num_of_ep,num_of_el)
-                plt.xlabel('epoch')
-                plt.show()
-                plt.title('% of total elements')
-                plt.plot(num_of_ep, per_of_el)
-                plt.xlabel('epoch')
-                plt.show()
+                # ! plt.title('Number of elements')
+                # ! plt.plot(num_of_ep,num_of_el)
+                # ! plt.xlabel('epoch')
+                # ! plt.show()
+                # ! plt.title('% of total elements')
+                # ! plt.plot(num_of_ep, per_of_el)
+                # ! plt.xlabel('epoch')
+                # ! plt.show()
+        pbar.set_description(f"{phase_str} [misclassified edges = {percentage.detach().cpu().item()*100 : .4f}%]")
     
     return False
             
@@ -505,4 +510,5 @@ if __name__ == '__main__':
     dataset = 'Cora'
     model, N1, N2, edges = create_model(f"{dataset_relpath}/{dataset}", latent_dim)
     is_reconstructed = train(model, N1, N2, edges)
+    # torch.save(model, "")
     pdb.set_trace()            
