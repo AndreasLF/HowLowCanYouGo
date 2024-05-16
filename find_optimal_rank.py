@@ -79,6 +79,8 @@ def find_optimal_rank(min_rank: int,
         model.latent_z = torch.nn.Parameter(X@V, requires_grad=True)
         model.latent_w = torch.nn.Parameter(Y@V, requires_grad=True)
 
+        del X; del Y; del V; del _;
+
         save_path = make_model_save_path(dataset=dataset_name, rank=current_rank,results_folder=results_folder, exp_id=exp_id)
         is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, dataset_name=dataset_name, model_path=save_path, wandb_logging=wandb_logging)
         torch.save(model, save_path)
