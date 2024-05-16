@@ -133,6 +133,7 @@ class Trainer:
                                 'batch_type': dataloader_class_name,
                                 'exp_id': self.exp_id,
                                 'reconstruction_check': self.reconstruction_check,
+                                'hinge-margin': 0
                                 })         
 
         if self.reconstruction_check == "frob" or self.reconstruction_check == "both":
