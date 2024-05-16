@@ -34,7 +34,12 @@ def find_optimal_rank(min_rank: int,
     """
     dataset_name = dataset.split("/")[-1]
 
-    exp_id = str(uuid.uuid4())
+   # checkpoints/datasetname_<exp_id>/filename
+    if load_ckpt:
+        exp_id = load_ckpt.split("/")[1].split("_")[-1]
+        print(f"Experiment id of loaded checkpoint: {exp_id}")
+    else:
+        exp_id = str(uuid.uuid4())
 
     lower_bound = min_rank
     upper_bound = max_rank
@@ -80,7 +85,13 @@ def find_optimal_rank(min_rank: int,
         print(f'Training FIRST model with rank {upper_bound}')
         search_state = {'lb': lower_bound, 'ub': upper_bound, 'full_recon_model': None}
         save_path = make_model_save_path(dataset=dataset_name, rank=upper_bound, results_folder=results_folder, exp_id=exp_id)
-        is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, phase_epochs=phase_epochs, dataset_name=dataset_name, model_path=save_path, wandb_logging=wandb_logging)
+        is_fully_reconstructed = train(model, N1, N2, edges, 
+                                    exp_id=exp_id, 
+                                    phase_epochs=phase_epochs, 
+                                    dataset_name=dataset_name,
+                                    model_path=save_path, 
+                                    wandb_logging=wandb_logging, 
+                                    search_state=search_state)
         torch.save(model, save_path)
         
         svd_target = svd_target or compute_svd_target(model)
