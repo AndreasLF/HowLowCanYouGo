@@ -7,7 +7,7 @@ Created on Thu Oct  1 13:47:48 2020
 
 # Import all the packages
 import pdb
-from os import mkdirs as os_mkdirs
+import os
 from tqdm import tqdm
 import torch
 import torch.nn as nn
@@ -398,7 +398,7 @@ def train(model,
         metrics = {'epoch': epoch}
 
         if epoch % 1_000 == 0 and epoch != 0:
-            os_mkdirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
+            os.mkdirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
             torch.save(model.state_dict(), f'checkpoints/{dataset_name}_{exp_id}/EE_model_{epoch}.ckpt') # state-dict
 
         if epoch < phase_epochs[1]: # ! PHASE 1
