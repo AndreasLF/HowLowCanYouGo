@@ -371,17 +371,27 @@ def train(model,
 
     rank = model.latent_dim
     if wandb_logging:
-        wandb.init(project="GraphEmbeddings", 
-                            config={'model_class': "LSM",
-                                    'data': dataset_name,
-                                    'rank': rank, 
-                                    'phase1_epochs': phase_epochs[1],
-                                    'phase2_epochs': phase_epochs[2],
-                                    'phase3_epochs': phase_epochs[3],
-                                    'kd_tree_freq': kd_tree_freq,
-                                    'exp_id': exp_id,
-                                    'learning_rate': learning_rate
-                                    })         
+        wandb_run_id = search_state.get(["wandb_id"], None)
+        if wandb_run_id is not None: 
+            run = wandb.init(project="GraphEmbeddings", 
+                                config={'model_class': "LSM",
+                                        'data': dataset_name,
+                                        'rank': rank, 
+                                        'phase1_epochs': phase_epochs[1],
+                                        'phase2_epochs': phase_epochs[2],
+                                        'phase3_epochs': phase_epochs[3],
+                                        'kd_tree_freq': kd_tree_freq,
+                                        'exp_id': exp_id,
+                                        'learning_rate': learning_rate
+                                        })   
+
+            search_state["wandb_id"] = run.id
+        else:   
+            # Resume logging to another experiment
+            wandb.init(project="GraphEmbeddings",
+            resume="allow",  # Use "allow" to resume if possible, "must" to enforce resumption
+            id=wandb_run_id  # Use the run_id from the previous run
+            )     
 
 
 # ################################################################################################################################################################
