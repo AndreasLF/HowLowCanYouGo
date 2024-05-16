@@ -472,6 +472,11 @@ def train(model,
     # TODO LR scheduler for hinge?
     for epoch in pbar:
         metrics = {"epoch": phase_epochs[2] + epoch + 1}
+
+        if epoch % 1_000 == 0 and epoch != 0:
+            os_mkdirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
+            total_epochs = epoch + phase_epochs[2] # save ckpt with total epochs (phase1-, phase2- and phase3-epochs) - currently, phase2 epochs contains both phase1 and phase2  
+            torch.save(model.state_dict(), f'checkpoints/{dataset_name}_{exp_id}/EE_model_{total_epochs}.ckpt') # state-dict
                         
         loss=-model.final_analytical(i_link, j_link, i_non_link, j_non_link)/N1
         last_hinge_loss = loss.detach().cpu().item()
