@@ -358,15 +358,15 @@ def train(model,
           N2,
           edges,
           exp_id = None,
-          phase_epochs = {1: 1_0, 2: 5_0, 3: 10_0},
+          phase_epochs = {1: 1_000, 2: 5_000, 3: 10_000},
           kd_tree_freq = 5,
           learning_rate = 0.1,
+          learning_rate_hinge = 0.1,
           dataset_name = None,
           model_path = "notset",
           wandb_logging = True):
     torch.autograd.set_detect_anomaly(True)
 
-    learning_rate = 0.1
     rank = model.latent_dim
     if wandb_logging:
         wandb.init(project="GraphEmbeddings", 
@@ -381,9 +381,6 @@ def train(model,
                                     'learning_rate': learning_rate
                                     })         
 
-    num_of_el=[]
-    num_of_ep=[]
-    per_of_el=[]
 
 # ################################################################################################################################################################
 # ################################################################################################################################################################
@@ -394,16 +391,16 @@ def train(model,
     model.scaling=0
     print(f'PHASE 1: Running HBDM for {phase_epochs[1]} iterations')
     phase_str = "PHASE 1"
-    last_hbdm_loss, last_hinge_loss = 0, 0
+    last_hbdm_loss, last_hinge_loss = torch.tensor(float('NaN')), torch.tensor(float('NaN'))
     pbar = tqdm(range(phase_epochs[2] + 1))
     for epoch in pbar:
-        if epoch < phase_epochs[1]:
+        if epoch < phase_epochs[1]: # ! PHASE 1
             loss = -model.LSM_likelihood_bias(epoch=epoch) / N1
             optimizer.zero_grad()  # clear the gradients.   
             loss.backward()  # backpropagate
             optimizer.step()  # update the weights
             last_hbdm_loss = loss.detach().cpu().item()
-        else:
+        else: # ! PHASE 2
             if epoch == phase_epochs[1]:
                 print('PHASE 2: Running HBDM and Hinge loss, for every HBDM iteration running {kd_tree_freq} iterations for the hinge loss')
                 phase_str = "PHASE 2"
@@ -422,7 +419,7 @@ def train(model,
                 i_non_link = i_non_link[mask]
                 j_non_link = j_non_link[mask]
 
-                if num_elements == 0:
+                if num_elements == 0: # ! PERFECT RECONSTRUCTION
                     torch.save(model.state_dict(), 'EE_model.pth')
                     print('Total reconstruction achieved')
                     return True
@@ -441,17 +438,6 @@ def train(model,
                     print(f'Miss-classified percentage of total elements: {100 * percentage}%, i.e. {num_elements} elements',)
                     print(f'compared to nlogn, i.e. {num_elements / (N1 * np.log(N1))} elements',)
 
-                    num_of_el.append(num_elements.numpy())
-                    num_of_ep.append(epoch)
-                    per_of_el.append(100 * percentage.numpy())
-                    # ! plt.title('Number of elements')
-                    # ! plt.plot(num_of_ep, num_of_el)
-                    # ! plt.xlabel('epoch')
-                    # ! plt.show()
-                    # ! plt.title('% of total elements')
-                    # ! plt.plot(num_of_ep, per_of_el)
-                    # ! plt.xlabel('epoch')
-                    # ! plt.show()
         pbar.set_description(f"[{phase_str}] [last HBDM loss={last_hbdm_loss:.4f}] [last Hinge loss={last_hinge_loss:.4f}]")
                 
     print(f'PHASE 3: Running Hinge loss only (building kdtree every {kd_tree_freq} iterations)')
@@ -467,24 +453,21 @@ def train(model,
     mask=i_non_link!=j_non_link
     i_non_link=i_non_link[mask]
     j_non_link=j_non_link[mask]
-    num_of_el=[]
-    num_of_ep=[]
-    per_of_el=[]
 
 
     pbar = tqdm(range(phase_epochs[3] + 1))
+    optimizer_hinge = optim.Adam(model.parameters(), lr=learning_rate_hinge)
+    # TODO LR scheduler for hinge?
     for epoch in pbar:
                         
         loss=-model.final_analytical(i_link, j_link, i_non_link, j_non_link)/N1
     
-        optimizer.zero_grad() # clear the gradients.   
+        optimizer_hinge.zero_grad() # clear the gradients.   
         loss.backward() # backpropagate
-        optimizer.step() # update the weights
+        optimizer_hinge.step() # update the weights
         
         # scheduler.step()
         if epoch%kd_tree_freq==0: # ! evalute every 5 or 25? etc.
-            # print(loss.item())
-            # print(epoch)
             if epoch%kd_tree_freq==0:
                 percentage,num_elements,active=check_reconctruction(edges,model.latent_z,model.latent_w,model.bias,N1,N2)
                 i_link,j_link=active.indices()[:,active.values()==1]
@@ -494,9 +477,7 @@ def train(model,
                 i_non_link=i_non_link[mask]
                 j_non_link=j_non_link[mask]
 
-                # print(f'Miss-classified percentage of total elements: {100*percentage}%, i.e. {num_elements} elements',)
-                if num_elements==0:
-                    # torch.save(model.state_dict(), f'EE_model_{model}_{dataset}.pth')
+                if num_elements==0: # ! PERFECT RECONSTRUCTION
                     print('Total reconstruction achieved!')
                     save_path = model_path.replace('.pt', '_FR.pt')
                     if wandb_logging:
@@ -504,22 +485,7 @@ def train(model,
                         wandb.finish()
                     return True
                 
-            if epoch%10:
-                num_of_el.append(num_elements.detach().cpu().numpy())
-                num_of_ep.append(epoch)
-                per_of_el.append(100*percentage.detach().cpu().numpy())
-                #percentage,num_elements=check_reconctruction_analytical(edges,model.latent_z,model.latent_w,model.bias,N1,N2)
-                #print(f'Miss-classified percentage of total elements: {percentage} %, i.e. {num_elements} number of elements',)
-                #roc,pr=model.link_prediction() #perfom link prediction and return auc-roc, auc-pr
-                # ! plt.title('Number of elements')
-                # ! plt.plot(num_of_ep,num_of_el)
-                # ! plt.xlabel('epoch')
-                # ! plt.show()
-                # ! plt.title('% of total elements')
-                # ! plt.plot(num_of_ep, per_of_el)
-                # ! plt.xlabel('epoch')
-                # ! plt.show()
-        pbar.set_description(f"{phase_str} [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
+        pbar.set_description(f"[{phase_str}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
     
 
     if wandb_logging:
