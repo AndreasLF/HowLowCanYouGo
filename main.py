@@ -376,7 +376,7 @@ def train(model,
     rank = model.latent_dim
     if wandb_logging:
         wandb_run_id = search_state.get("wandb_id", None)
-        if wandb_run_id is not None: 
+        if wandb_run_id is None: 
             run = wandb.init(project="GraphEmbeddings", 
                                 config={'model_class': "LSM",
                                         'data': dataset_name,
