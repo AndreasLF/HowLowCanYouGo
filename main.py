@@ -7,6 +7,7 @@ Created on Thu Oct  1 13:47:48 2020
 
 # Import all the packages
 import pdb
+from os import mkdirs as os_mkdirs
 from tqdm import tqdm
 import torch
 import torch.nn as nn
@@ -22,7 +23,7 @@ from sklearn import metrics
 # from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
 import wandb
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# device = torch.device('cpu')
+device = torch.device('cpu')
 
 
 from sklearn.neighbors import KDTree
@@ -37,7 +38,6 @@ else:
 
     
     
-undirected=1
 
 import matplotlib.pyplot as plt
 
@@ -391,26 +391,31 @@ def train(model,
     model.scaling=0
     print(f'PHASE 1: Running HBDM for {phase_epochs[1]} iterations')
     phase_str = "PHASE 1"
+    percentage, num_elements = torch.tensor(float('NaN')), torch.tensor(float('NaN'))
     last_hbdm_loss, last_hinge_loss = torch.tensor(float('NaN')), torch.tensor(float('NaN'))
     pbar = tqdm(range(phase_epochs[2] + 1))
     for epoch in pbar:
         metrics = {'epoch': epoch}
 
+        if epoch % 1_000 == 0 and epoch != 0:
+            os_mkdirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
+            torch.save(model.state_dict(), f'checkpoints/{dataset_name}_{exp_id}/EE_model_{epoch}.ckpt') # state-dict
+
         if epoch < phase_epochs[1]: # ! PHASE 1
             loss = -model.LSM_likelihood_bias(epoch=epoch) / N1
-            optimizer.zero_grad()  # clear the gradients.   
+            optimizer.zero_grad(set_to_none=True)  # clear the gradients.   
             loss.backward()  # backpropagate
             optimizer.step()  # update the weights
             last_hbdm_loss = loss.detach().cpu().item()
             metrics["hbdm_loss"] = last_hbdm_loss
         else: # ! PHASE 2
             if epoch == phase_epochs[1]:
-                print('PHASE 2: Running HBDM and Hinge loss, for every HBDM iteration running {kd_tree_freq} iterations for the hinge loss')
+                print(f'PHASE 2: Running HBDM and Hinge loss, for every HBDM iteration running {kd_tree_freq} iterations for the hinge loss')
                 phase_str = "PHASE 2"
 
             if epoch % 2 == 0:
                 loss = -model.LSM_likelihood_bias(epoch=epoch) / N1
-                optimizer.zero_grad()  # clear the gradients.   
+                optimizer.zero_grad(set_to_none=True)  # clear the gradients.   
                 loss.backward()  # backpropagate
                 optimizer.step()  # update the weights
                 last_hbdm_loss = loss.detach().cpu().item()
@@ -430,22 +435,22 @@ def train(model,
 
                 for j in range(5):
                     loss = -model.final_analytical(i_link, j_link, i_non_link, j_non_link, hinge=True) / N1
-                    optimizer.zero_grad()  # clear the gradients.
+                    optimizer.zero_grad(set_to_none=True)  # clear the gradients.
                     loss.backward()  # backpropagate
                     optimizer.step()  # update the weights
-                    last_hinge_loss = loss.detach().cpu().item()
+                last_hinge_loss = loss.detach().cpu().item()
                 metrics["hinge_loss"] = last_hinge_loss
 
 
-            if epoch % 100 == 0:
+            # if epoch % 100 == 0:
 
-                if epoch > 400:
-                    percentage, num_elements, active = check_reconctruction(edges, model.latent_z, model.latent_w, model.bias, N1, N2)
-                    print(f'Miss-classified percentage of total elements: {100 * percentage}%, i.e. {num_elements} elements',)
-                    print(f'compared to nlogn, i.e. {num_elements / (N1 * np.log(N1))} elements',)
+            #     if epoch > 400:
+            #         percentage, num_elements, active = check_reconctruction(edges, model.latent_z, model.latent_w, model.bias, N1, N2)
+            #         print(f'Miss-classified percentage of total elements: {100 * percentage}%, i.e. {num_elements} elements',)
+            #         print(f'compared to nlogn, i.e. {num_elements / (N1 * np.log(N1))} elements',)
 
-        pbar.set_description(f"[{phase_str}] [last HBDM loss={last_hbdm_loss:.4f}] [last Hinge loss={last_hinge_loss:.4f}]")
-        wandb.log(metrics)
+        pbar.set_description(f"[{phase_str}] [last HBDM loss={last_hbdm_loss:.4f}] [last Hinge loss={last_hinge_loss:.4f}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
+        if wandb_logging: wandb.log(metrics)
                 
     print(f'PHASE 3: Running Hinge loss only (building kdtree every {kd_tree_freq} iterations)')
     phase_str = "PHASE 3"
@@ -469,8 +474,9 @@ def train(model,
         metrics = {"epoch": phase_epochs[2] + epoch + 1}
                         
         loss=-model.final_analytical(i_link, j_link, i_non_link, j_non_link)/N1
+        last_hinge_loss = loss.detach().cpu().item()
     
-        optimizer_hinge.zero_grad() # clear the gradients.   
+        optimizer_hinge.zero_grad(set_to_none=True) # clear the gradients.   
         loss.backward() # backpropagate
         metrics["hinge_loss"] = last_hinge_loss
         optimizer_hinge.step() # update the weights
@@ -494,10 +500,10 @@ def train(model,
                         wandb.finish()
                     return True
                 
-        pbar.set_description(f"[{phase_str}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
+        pbar.set_description(f"[{phase_str}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
         metrics["misclassified_dyads_perc"] = percentage.detach().cpu().item()*100
         metrics["misclassified_dyads"] = num_elements
-        wandb.log(metrics)
+        if wandb_logging: wandb.log(metrics)
     
 
     if wandb_logging:
@@ -505,7 +511,8 @@ def train(model,
         wandb.finish()
     return False
             
-            
+
+# !!!!! FOR EED SEARCH, RUN find_optimal_rank.py
 if __name__ == '__main__':
     latent_dim = 50
     dataset_relpath = "datasets"

@@ -14,9 +14,11 @@ def make_model_save_path(dataset, rank,results_folder="results", exp_id="_"):
 def find_optimal_rank(min_rank: int, 
                     max_rank: int, 
                     dataset: str,
+                    phase_epochs: dict,
                     results_folder='results',
-                    device='cpu',
-                    wandb_logging = False):
+                    load_ckpt: str = None, # TODO add load-ckpt
+                    device: str = 'cpu',
+                    wandb_logging: bool = False):
     """
     Find the optimal rank for the model by starting on a 
         high guess (i.e. upper bound) at the optimal rank, followed 
@@ -55,16 +57,24 @@ def find_optimal_rank(min_rank: int,
         # Center
         return svd_target - svd_target.mean(dim=0).unsqueeze(0) # center svd_target -> PCA
 
-
-    print(f'Training FIRST model with rank {upper_bound}')
     model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=upper_bound, device=device)
-    save_path = make_model_save_path(dataset=dataset_name, rank=upper_bound, results_folder=results_folder, exp_id=exp_id)
-    is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, dataset_name=dataset_name, model_path=save_path, wandb_logging=wandb_logging)
-    torch.save(model, save_path)
+
+    if load_ckpt:
+        # ! ensure that embedding dims in {model}.pt-file match max_rank params
+        print(f'Initializing FIRST model from {load_ckpt}')
+        _loaded = torch.load(load_ckpt)
+        _loaded = _loaded.state_dict() if _loaded.__class__.__name__ == 'LSM' else _loaded # assume _loaded contains state dict if it is not an LSM instance
+        model.load_state_dict()
+        del _loaded
+    else:
+        print(f'Training FIRST model with rank {upper_bound}')
+        save_path = make_model_save_path(dataset=dataset_name, rank=upper_bound, results_folder=results_folder, exp_id=exp_id)
+        is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, phase_epochs=phase_epochs, dataset_name=dataset_name, model_path=save_path, wandb_logging=wandb_logging)
+        torch.save(model, save_path)
 
     if is_fully_reconstructed:
         print("Full reconstruction not found with random initialization")
-        return False
+        return -1 # ! -1 <=> no rank found
 
     svd_target = compute_svd_target(model)
 
@@ -82,7 +92,7 @@ def find_optimal_rank(min_rank: int,
         del X; del Y; del V; del _;
 
         save_path = make_model_save_path(dataset=dataset_name, rank=current_rank,results_folder=results_folder, exp_id=exp_id)
-        is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, dataset_name=dataset_name, model_path=save_path, wandb_logging=wandb_logging)
+        is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, phase_epochs=phase_epochs, dataset_name=dataset_name, model_path=save_path, wandb_logging=wandb_logging)
         torch.save(model, save_path)
 
         # Check if the reconstruction is within the threshold
@@ -109,18 +119,28 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--device', type=str, default='cuda')
-    parser.add_argument("--dataset", type=str, default='Cora', help="Dataset to run experiment for")
-    parser.add_argument("--max", type=int, default=100, help="Max rank to search for")
-    parser.add_argument("--min", type=int, default=1, help="Max rank to search for")
-    parser.add_argument("--wandb", action='store_true', help='Log to wandb')
+    parser.add_argument("--dataset", type=str, default='Cora', help="Dataset (graph) to run search on for.")
+    parser.add_argument("--load-ckpt", type=str, default=None, help="Specify which model state dict to initialize the search.")
+    parser.add_argument("--phase1", type=int, default=1_000,  help="How many steps to run phase 1 for.")
+    parser.add_argument("--phase2", type=int, default=5_000,  help="How many steps to run phase 2 for.")
+    parser.add_argument("--phase3", type=int, default=10_000, help="How many steps to run phase 3 for.")
+    parser.add_argument("--max", type=int, default=100, help="Max rank, i.e. upper bound of search range.")
+    parser.add_argument("--min", type=int, default=1, help="Min rank, i.e. lower bound of search range.")
+    parser.add_argument("--wandb", action='store_true', help='Flag for logging to wandb')
 
     args = parser.parse_args()
-    device = args.device
-
-    dataset = args.dataset
-
+    print('# Options')
+    for key, value in sorted(vars(args).items()):
+        print(key, '=', value)
 
     dataset_relpath = "datasets"
     # find_optimal_rank(3,100,f"{dataset_relpath}/Cora")
-    find_optimal_rank(args.min,args.max,f"{dataset_relpath}/{dataset}", device=device, wandb_logging=args.wandb)
+    find_optimal_rank(args.min, args.max,
+                      f"{dataset_relpath}/{args.dataset}", 
+                      phase_epochs={1: args.phase1, 
+                                    2: args.phase2 + args.phase1, # ? due to the way the loop ranges are defined inside train()
+                                    3: args.phase3},
+                      load_ckpt=args.load_ckpt,
+                      device=args.device, 
+                      wandb_logging=args.wandb)
 
