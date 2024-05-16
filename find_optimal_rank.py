@@ -3,6 +3,7 @@ from main import create_model
 from main import train
 import uuid
 import os
+from wandb_api_utils import WANDbAPIUtils
 
 
 def make_model_save_path(dataset, rank,results_folder="results", exp_id="_"):
@@ -14,7 +15,8 @@ def find_optimal_rank(min_rank: int,
                     max_rank: int, 
                     dataset: str,
                     results_folder='results',
-                    device='cpu'):
+                    device='cpu',
+                    wandb_logging = False):
     """
     Find the optimal rank for the model by starting on a 
         high guess (i.e. upper bound) at the optimal rank, followed 
@@ -57,7 +59,7 @@ def find_optimal_rank(min_rank: int,
     print(f'Training FIRST model with rank {upper_bound}')
     model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=upper_bound, device=device)
     save_path = make_model_save_path(dataset=dataset, rank=upper_bound, results_folder=results_folder, exp_id=exp_id)
-    is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, dataset_name=dataset_name, model_path=save_path)
+    is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, dataset_name=dataset_name, model_path=save_path, wandb_logging=wandb_logging)
     torch.save(model, save_path)
 
     if is_fully_reconstructed:
@@ -78,7 +80,7 @@ def find_optimal_rank(min_rank: int,
         model.latent_w = torch.nn.Parameter(Y@V, requires_grad=True)
 
         save_path = make_model_save_path(dataset=dataset, rank=current_rank,results_folder=results_folder, exp_id=exp_id)
-        is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, dataset_name=dataset_name, model_path=save_path)
+        is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, dataset_name=dataset_name, model_path=save_path, wandb_logging=wandb_logging)
         torch.save(model, save_path)
 
         # Check if the reconstruction is within the threshold
@@ -93,6 +95,10 @@ def find_optimal_rank(min_rank: int,
             print(f'Full reconstruction NOT found for rank {current_rank}\n')
             lower_bound = current_rank + 1
 
+    if wandb_logging:  
+        print("Tagging best rank in wandb")
+        wandb_api = WANDbAPIUtils("GraphEmbeddings")
+        wandb_api.tag_best_rank(exp_id) 
 
     return optimal_rank
 
@@ -105,13 +111,15 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, default='Cora', help="Dataset to run experiment for")
     parser.add_argument("--max", type=int, default=100, help="Max rank to search for")
     parser.add_argument("--min", type=int, default=1, help="Max rank to search for")
+    parser.add_argument("--wandb", action='store_true', help='Log to wandb')
 
     args = parser.parse_args()
     device = args.device
 
     dataset = args.dataset
 
+
     dataset_relpath = "datasets"
     # find_optimal_rank(3,100,f"{dataset_relpath}/Cora")
-    find_optimal_rank(args.min,args.max,f"{dataset_relpath}/{dataset}", device=device)
+    find_optimal_rank(args.min,args.max,f"{dataset_relpath}/{dataset}", device=device, wandb_logging=args.wandb)
 
