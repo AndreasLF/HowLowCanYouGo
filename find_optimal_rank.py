@@ -105,4 +105,4 @@ if __name__ == "__main__":
     device = 'cuda'
     dataset_relpath = "datasets"
     # find_optimal_rank(3,100,f"{dataset_relpath}/Cora")
-    find_optimal_rank(1,10,f"{dataset_relpath}/Cora", device=device)
+    find_optimal_rank(1,5,f"{dataset_relpath}/Cora", device=device)

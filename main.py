@@ -364,7 +364,7 @@ def train(model,
           N2,
           edges,
           exp_id = None,
-          phase_epochs = {1: 1_0, 2: 5_000, 3: 10_000},
+          phase_epochs = {1: 1_0, 2: 5_0, 3: 10_0},
           kd_tree_freq = 5):
     torch.autograd.set_detect_anomaly(True)
 
@@ -481,9 +481,9 @@ def train(model,
                     return True
                 
             if epoch%10:
-                num_of_el.append(num_elements.numpy())
+                num_of_el.append(num_elements.detach().cpu().numpy())
                 num_of_ep.append(epoch)
-                per_of_el.append(100*percentage.numpy())
+                per_of_el.append(100*percentage.detach().cpu().numpy())
                 #percentage,num_elements=check_reconctruction_analytical(edges,model.latent_z,model.latent_w,model.bias,N1,N2)
                 #print(f'Miss-classified percentage of total elements: {percentage} %, i.e. {num_elements} number of elements',)
                 #roc,pr=model.link_prediction() #perfom link prediction and return auc-roc, auc-pr
