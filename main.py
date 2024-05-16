@@ -23,7 +23,7 @@ from sklearn import metrics
 # from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
 import wandb
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = torch.device('cpu')
+# device = torch.device('cpu')
 
 
 from sklearn.neighbors import KDTree
@@ -375,7 +375,7 @@ def train(model,
 
     rank = model.latent_dim
     if wandb_logging:
-        wandb_run_id = search_state.get(["wandb_id"], None)
+        wandb_run_id = search_state.get("wandb_id", None)
         if wandb_run_id is not None: 
             run = wandb.init(project="GraphEmbeddings", 
                                 config={'model_class': "LSM",
