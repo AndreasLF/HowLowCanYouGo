@@ -17,7 +17,8 @@ def make_model_save_path(dataset, rank, full_reconstruct):
 def find_optimal_rank(min_rank: int, 
                     max_rank: int, 
                     dataset: str,
-                    results_folder='results'):
+                    results_folder='results',
+                    device='cpu'):
     """
     Find the optimal rank for the model by starting on a 
         high guess (i.e. upper bound) at the optimal rank, followed 
@@ -58,7 +59,7 @@ def find_optimal_rank(min_rank: int,
 
 
     print(f'Training FIRST model with rank {upper_bound}')
-    model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=upper_bound)
+    model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=upper_bound, device=device)
     is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id)
     save_path = make_model_save_path(dataset, upper_bound, is_fully_reconstructed)
     torch.save(model, save_path)
@@ -101,4 +102,7 @@ def find_optimal_rank(min_rank: int,
 
 
 if __name__ == "__main__":
-    find_optimal_rank(3,100,"cora")
+    device = 'cuda'
+    dataset_relpath = "datasets"
+    # find_optimal_rank(3,100,f"{dataset_relpath}/Cora")
+    find_optimal_rank(1,10,f"{dataset_relpath}/Cora", device=device)

@@ -27,7 +27,7 @@ from sklearn import metrics
 from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
 import seaborn as sns
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-device = torch.device('cpu')
+# device = torch.device('cpu')
 
 
 from sklearn.neighbors import KDTree
@@ -274,6 +274,8 @@ class LSM(nn.Module,Tree_kmeans_recursion,Create_missing_data,Spectral_clusterin
 
     
 def check_reconctruction(edges,Z,W,beta,N1,N2):
+    device = edges.device
+
     Z_np=Z.detach().cpu().numpy()
     W_np=W.detach().cpu().numpy()
     beta_np=beta.detach().cpu().numpy()
@@ -287,10 +289,10 @@ def check_reconctruction(edges,Z,W,beta,N1,N2):
     counts= tree.query_radius(X, r=beta_np,count_only=True)  
     indeces=tree.query_radius(X, r=beta_np)  
 
-    source_ind=torch.from_numpy(np.concatenate(indeces[0:N1]))
+    source_ind=torch.from_numpy(np.concatenate(indeces[0:N1])).to(device)
    # targets_ind=torch.from_numpy(np.concatenate(indeces[N1:]))
     
-    source_counts=torch.from_numpy(counts[0:N1])
+    source_counts=torch.from_numpy(counts[0:N1]).to(device)
    # targets_counts=torch.from_numpy(counts[N1:])
 
     total_i=torch.repeat_interleave(node_i,source_counts)
@@ -306,10 +308,10 @@ def check_reconctruction(edges,Z,W,beta,N1,N2):
 
     active_set_edges=cleaned_kd_i.T
 
-    s1 = torch.sparse_coo_tensor(edges, torch.ones(edges.shape[1]), (N1,N2)).coalesce()
+    s1 = torch.sparse_coo_tensor(edges, torch.ones(edges.shape[1], device=device), (N1,N2)).coalesce()
     mask=active_set_edges[0]!=active_set_edges[1]
     active_set_edges=active_set_edges[:,mask]
-    s2 = torch.sparse_coo_tensor(active_set_edges, torch.ones(active_set_edges.shape[1]), (N1,N2)).coalesce()
+    s2 = torch.sparse_coo_tensor(active_set_edges, torch.ones(active_set_edges.shape[1], device=device), (N1,N2)).coalesce()
     overall_=(s1-s2).coalesce()
     elements=(overall_.values()!=0).sum()
     return (elements)/(N1*(N2-1)),elements,overall_
@@ -338,12 +340,12 @@ def check_reconctruction_analytical(edges,Z,W,beta,N1,N2):
 # [] 
 
 
-def create_model(dataset, latent_dim, link_function = "SOFTPLUS"):
+def create_model(dataset, latent_dim, link_function = "SOFTPLUS", device='cpu'):
     # Available choices for link_function are ['EXP','SOFTPLUS']
     # ! if we use full adj matrix, do not concatenate i->j, j->i
-    sparse_i = torch.load(f'./{dataset}/sparse_i.pt')
-    sparse_j = torch.load(f'./{dataset}/sparse_j.pt')
-    edges=torch.vstack([sparse_i,sparse_j])
+    sparse_i = torch.load(f'./{dataset}/sparse_i.pt', map_location=device)
+    sparse_j = torch.load(f'./{dataset}/sparse_j.pt', map_location=device)
+    edges=torch.vstack([sparse_i,sparse_j]).to(device)
     
     N1=int(sparse_i.max()+1)
     N2=int(sparse_j.max()+1)
@@ -362,7 +364,7 @@ def train(model,
           N2,
           edges,
           exp_id = None,
-          phase_epochs = {1: 1_00, 2: 5_000, 3: 10_000},
+          phase_epochs = {1: 1_0, 2: 5_000, 3: 10_000},
           kd_tree_freq = 5):
     torch.autograd.set_detect_anomaly(True)
 
@@ -499,7 +501,8 @@ def train(model,
             
 if __name__ == '__main__':
     latent_dim = 50
-    dataset = 'cora'
-    model, N1, N2, edges = create_model(dataset, latent_dim)
+    dataset_relpath = "datasets"
+    dataset = 'Cora'
+    model, N1, N2, edges = create_model(f"{dataset_relpath}/{dataset}", latent_dim)
     is_reconstructed = train(model, N1, N2, edges)
     pdb.set_trace()            

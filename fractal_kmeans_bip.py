@@ -191,13 +191,3 @@ class Euclidean_Kmeans():
         o=o.index_add(0, cluster_idx[idx], inv_lambdas[idx])
 
         self.centroids=torch.mul(z,(1/(o+1e-06)).unsqueeze(-1))
-        
-        
-        
-
-    
-    
-
-
-
-
