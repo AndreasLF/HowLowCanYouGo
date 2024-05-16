@@ -40,7 +40,7 @@ sed -e "s|\${VENV_PATH}|$VENV_PATH|g" \
     -e "s|\${GPU_MODE}|$GPU_MODE|g" \
     -e "s|\${NUM_CORES}|$NUM_CORES|g" \
     -e "s|\${MEM_GB}|$MEM_GB|g" \
-    -e "s|\${EXPERIMENT_NAME}|$EXPERIMENT_NAME|g" \
+    -e "s|\${EXPERIMENT_NAME}|$DATA|g" \
     -e "s|\${RUN_EXPERIMENTS_ARGS}|$RUN_EXPERIMENTS_ARGS|g" \
     "$JOB_SCRIPT_TEMPLATE" > "$TEMP_JOB_SCRIPT"
 
