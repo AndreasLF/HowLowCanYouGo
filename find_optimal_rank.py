@@ -94,7 +94,7 @@ def find_optimal_rank(min_rank: int,
                                     search_state=search_state)
         torch.save(model, save_path)
         
-        svd_target = svd_target or compute_svd_target(model)
+        svd_target = compute_svd_target(model)
 
     if is_fully_reconstructed:
         print("Full reconstruction not found with random initialization")

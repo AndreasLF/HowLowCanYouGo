@@ -368,6 +368,9 @@ def train(model,
           search_state = {}
           ):
     
+    checkpoint_freq = 1_000
+    # checkpoint_freq = 5
+
     torch.autograd.set_detect_anomaly(True)
 
     rank = model.latent_dim
@@ -412,8 +415,8 @@ def train(model,
 
         metrics = {'epoch': epoch}
 
-        if epoch % 1_000 == 0 and epoch != 0 and search_state is not None:
-            os.makedirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
+        if epoch % checkpoint_freq == 0 and epoch != 0 and search_state is not None:
+            os.makedirs(f"checkpoints/{dataset_name}_{exp_id}", exist_ok=True)
             search_state['phase'] = int(phase_str[-1]) # hacky
             search_state['cur_epoch'] = epoch
             search_state['current_model'] = model.state_dict()
@@ -491,8 +494,8 @@ def train(model,
     for epoch in pbar:
         metrics = {"epoch": phase_epochs[2] + epoch + 1}
 
-        if epoch % 1_000 == 0 and epoch != 0 and search_state is not None:
-            os.makedirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
+        if epoch % checkpoint_freq == 0 and epoch != 0 and search_state is not None:
+            os.makedirs(f"checkpoints/{dataset_name}_{exp_id}", exist_ok=True)
             search_state['phase'] = 3
             search_state['cur_epoch'] = epoch
             search_state['current_model'] = model.state_dict()
