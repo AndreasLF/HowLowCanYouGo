@@ -5,15 +5,9 @@ import uuid
 import os
 
 
-def make_model_save_path(dataset, rank, full_reconstruct, results_folder="results"):
-
+def make_model_save_path(dataset, rank,results_folder="results", exp_id="_"):
     os.makedirs(results_folder, exist_ok=True)
-
-    uid = str(uuid.uuid4())
-    if full_reconstruct:
-        return f"{results_folder}/EE_model_LSM_{dataset}_{rank}_FR_{uid}.pt"
-    else:
-        return f"{results_folder}/EE_model_LSM_{dataset}_{rank}_{uid}.pt"
+    return f"{results_folder}/EE_model_LSM_{dataset}_{rank}_{exp_id}.pt"
 
 
 def find_optimal_rank(min_rank: int, 
@@ -34,6 +28,7 @@ def find_optimal_rank(min_rank: int,
         optimal_rank (int): The optimal rank
     
     """
+    dataset_name = dataset.split("/")[-1]
 
     exp_id = str(uuid.uuid4())
 
@@ -61,9 +56,8 @@ def find_optimal_rank(min_rank: int,
 
     print(f'Training FIRST model with rank {upper_bound}')
     model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=upper_bound, device=device)
-    is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id)
-    save_path = make_model_save_path(dataset=dataset, rank=upper_bound,
-                                     full_reconstruct=is_fully_reconstructed, results_folder=results_folder)
+    save_path = make_model_save_path(dataset=dataset, rank=upper_bound, results_folder=results_folder, exp_id=exp_id)
+    is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, dataset_name=dataset_name, model_path=save_path)
     torch.save(model, save_path)
 
     if is_fully_reconstructed:
@@ -83,9 +77,8 @@ def find_optimal_rank(min_rank: int,
         model.latent_z = X
         model.latent_w = Y
 
-        is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id)
-        save_path = make_model_save_path(dataset=dataset, rank=current_rank, 
-                                         full_reconstruct=is_fully_reconstructed, results_folder=results_folder)
+        save_path = make_model_save_path(dataset=dataset, rank=current_rank,results_folder=results_folder, exp_id=exp_id)
+        is_fully_reconstructed = train(model, N1, N2, edges, exp_id=exp_id, dataset_name=dataset_name, model_path=save_path)
         torch.save(model, save_path)
 
         # Check if the reconstruction is within the threshold

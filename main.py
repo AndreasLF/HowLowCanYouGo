@@ -9,23 +9,18 @@ Created on Thu Oct  1 13:47:48 2020
 import pdb
 from tqdm import tqdm
 import torch
-from torch.autograd import Variable
-import pandas as pd
 import torch.nn as nn
 import numpy as np
 import torch.optim as optim
-import torch.nn.functional as f# create a dummy data 
-import timeit
 from fractal_main_bip import Tree_kmeans_recursion
 from missing_data import Create_missing_data
 #from kmeans_cuda import Normal_Kmeans as Euclidean_Kmeans
-from copy import deepcopy
 # from blobs import *
 CUDA = torch.cuda.is_available()
 from spectral_clustering import Spectral_clustering_init
 from sklearn import metrics
-from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
-import seaborn as sns
+# from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
+import wandb
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 # device = torch.device('cpu')
 
@@ -43,7 +38,6 @@ else:
     
     
 undirected=1
-from scipy.sparse import coo_matrix,csr_matrix
 
 import matplotlib.pyplot as plt
 
@@ -365,9 +359,27 @@ def train(model,
           edges,
           exp_id = None,
           phase_epochs = {1: 1_0, 2: 5_0, 3: 10_0},
-          kd_tree_freq = 5):
+          kd_tree_freq = 5,
+          learning_rate = 0.1,
+          dataset_name = None,
+          model_path = "notset",
+          wandb_logging = True):
     torch.autograd.set_detect_anomaly(True)
 
+    learning_rate = 0.1
+    rank = model.latent_dim
+    if wandb_logging:
+        wandb.init(project="GraphEmbeddings", 
+                            config={'model_class': "LSM",
+                                    'data': dataset_name,
+                                    'rank': rank, 
+                                    'phase1_epochs': phase_epochs[1],
+                                    'phase2_epochs': phase_epochs[2],
+                                    'phase3_epochs': phase_epochs[3],
+                                    'kd_tree_freq': kd_tree_freq,
+                                    'exp_id': exp_id,
+                                    'learning_rate': learning_rate
+                                    })         
 
     num_of_el=[]
     num_of_ep=[]
@@ -377,7 +389,7 @@ def train(model,
 # ################################################################################################################################################################
 # ################################################################################################################################################################
     
-    optimizer = optim.Adam(model.parameters(), 0.1)  
+    optimizer = optim.Adam(model.parameters(), learning_rate)  
 
     model.scaling=0
     print(f'PHASE 1: Running HBDM for {phase_epochs[1]} iterations')
@@ -476,8 +488,12 @@ def train(model,
 
                 print(f'Miss-classified percentage of total elements: {100*percentage}%, i.e. {num_elements} elements',)
                 if num_elements==0:
-                    torch.save(model.state_dict(), f'EE_model_{model}_{dataset}.pth')
+                    # torch.save(model.state_dict(), f'EE_model_{model}_{dataset}.pth')
                     print('Total reconstruction achieved')
+                    save_path = model_path.replace('.pt', '_FR.pt')
+                    if wandb_logging:
+                        wandb.config.update({'full_reconstruction': True, "model_path":save_path})
+                        wandb.finish()
                     return True
                 
             if epoch%10:
@@ -496,6 +512,10 @@ def train(model,
                 plt.xlabel('epoch')
                 plt.show()
     
+
+    if wandb_logging:
+        wandb.config.update({"model_path": model_path})
+        wandb.finish()
     return False
             
             
