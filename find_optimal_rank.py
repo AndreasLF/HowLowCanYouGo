@@ -98,10 +98,9 @@ def find_optimal_rank(min_rank: int,
 
 
 if __name__ == "__main__":
-
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--device', type=str, default='cpu')
+    parser.add_argument('--device', type=str, default='cuda')
     parser.add_argument("--dataset", type=str, default='Cora', help="Dataset to run experiment for")
     parser.add_argument("--max", type=int, default=100, help="Max rank to search for")
     parser.add_argument("--min", type=int, default=1, help="Max rank to search for")
