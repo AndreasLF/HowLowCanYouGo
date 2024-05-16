@@ -397,12 +397,15 @@ def train(model,
     last_hbdm_loss, last_hinge_loss = 0, 0
     pbar = tqdm(range(phase_epochs[2] + 1))
     for epoch in pbar:
+        metrics = {'epoch': epoch}
+
         if epoch < phase_epochs[1]:
             loss = -model.LSM_likelihood_bias(epoch=epoch) / N1
             optimizer.zero_grad()  # clear the gradients.   
             loss.backward()  # backpropagate
             optimizer.step()  # update the weights
             last_hbdm_loss = loss.detach().cpu().item()
+            metrics["hbdm_loss"] = last_hbdm_loss
         else:
             if epoch == phase_epochs[1]:
                 print('PHASE 2: Running HBDM and Hinge loss, for every HBDM iteration running {kd_tree_freq} iterations for the hinge loss')
@@ -414,6 +417,7 @@ def train(model,
                 loss.backward()  # backpropagate
                 optimizer.step()  # update the weights
                 last_hbdm_loss = loss.detach().cpu().item()
+                metrics["hbdm_loss"] = last_hbdm_loss
             else:
                 percentage, num_elements, active = check_reconctruction(edges, model.latent_z, model.latent_w, model.bias, N1, N2)
                 i_link, j_link = active.indices()[:, active.values() == 1]
@@ -433,6 +437,8 @@ def train(model,
                     loss.backward()  # backpropagate
                     optimizer.step()  # update the weights
                     last_hinge_loss = loss.detach().cpu().item()
+                metrics["hinge_loss"] = last_hinge_loss
+
 
             if epoch % 100 == 0:
 
@@ -453,6 +459,7 @@ def train(model,
                     # ! plt.xlabel('epoch')
                     # ! plt.show()
         pbar.set_description(f"[{phase_str}] [last HBDM loss={last_hbdm_loss:.4f}] [last Hinge loss={last_hinge_loss:.4f}]")
+        wandb.log(metrics)
                 
     print(f'PHASE 3: Running Hinge loss only (building kdtree every {kd_tree_freq} iterations)')
     phase_str = "PHASE 3"
@@ -474,11 +481,13 @@ def train(model,
 
     pbar = tqdm(range(phase_epochs[3] + 1))
     for epoch in pbar:
+        metrics = {"epoch": phase_epochs[2] + epoch + 1}
                         
         loss=-model.final_analytical(i_link, j_link, i_non_link, j_non_link)/N1
     
         optimizer.zero_grad() # clear the gradients.   
-        loss.backward() # backpropagate
+        last_hinge_loss = loss.backward() # backpropagate
+        metrics["hinge_loss"] = last_hinge_loss
         optimizer.step() # update the weights
         
         # scheduler.step()
@@ -520,6 +529,9 @@ def train(model,
                 # ! plt.xlabel('epoch')
                 # ! plt.show()
         pbar.set_description(f"{phase_str} [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
+        metrics["misclassified_dyads_perc"] = percentage.detach().cpu().item()*100
+        metrics["misclassified_dyads"] = num_elements
+        wandb.log(metrics)
     
 
     if wandb_logging:
