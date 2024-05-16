@@ -365,8 +365,9 @@ def train(model,
           dataset_name = None,
           model_path = "notset",
           wandb_logging = True,
-          search_state = None
+          search_state = {}
           ):
+    
     torch.autograd.set_detect_anomaly(True)
 
     rank = model.latent_dim
@@ -405,12 +406,16 @@ def train(model,
     phase_str = "PHASE 1"
     percentage, num_elements = torch.tensor(float('NaN')), torch.tensor(float('NaN'))
     last_hbdm_loss, last_hinge_loss = torch.tensor(float('NaN')), torch.tensor(float('NaN'))
-    pbar = tqdm(range(phase_epochs[2] + 1))
+    pbar = tqdm(range(search_state.get('cur_epoch', 0), phase_epochs[2] + 1))
     for epoch in pbar:
+        if search_state.get("phase", None) == 3: break # if starting form a checkpoint in phase 3
+
         metrics = {'epoch': epoch}
 
         if epoch % 1_000 == 0 and epoch != 0 and search_state is not None:
             os.makedirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
+            search_state['phase'] = int(phase_str[-1]) # hacky
+            search_state['cur_epoch'] = epoch
             search_state['current_model'] = model.state_dict()
             torch.save(search_state, f'checkpoints/{dataset_name}_{exp_id}/EE_model_{epoch}.ckpt') # EED search state
 
@@ -480,14 +485,16 @@ def train(model,
     j_non_link=j_non_link[mask]
 
 
-    pbar = tqdm(range(phase_epochs[3] + 1))
-    optimizer_hinge = optim.Adam(model.parameters(), lr=learning_rate_hinge)
     # TODO LR scheduler for hinge?
+    optimizer_hinge = optim.Adam(model.parameters(), lr=learning_rate_hinge)
+    pbar = tqdm(range(search_state.get('cur_epoch', 0), phase_epochs[3] + 1))
     for epoch in pbar:
         metrics = {"epoch": phase_epochs[2] + epoch + 1}
 
         if epoch % 1_000 == 0 and epoch != 0 and search_state is not None:
             os.makedirs(f"checkpoints/{dataset_name}_{exp_id}", exists_ok=True)
+            search_state['phase'] = 3
+            search_state['cur_epoch'] = epoch
             search_state['current_model'] = model.state_dict()
             torch.save(search_state, f'checkpoints/{dataset_name}_{exp_id}/EE_model_{epoch}.ckpt') # EED search state
                         
