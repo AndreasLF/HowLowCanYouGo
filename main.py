@@ -59,7 +59,7 @@ class LSM(nn.Module,Tree_kmeans_recursion,Create_missing_data,Spectral_clusterin
         #self.kmeans_tree_recursively(depth=80,init_first_layer_cent=self.first_centers)
         self.bias=nn.Parameter(torch.rand(1,device=device))
         self.scaling_factor=nn.Parameter(torch.randn(1,device=device))
-        self.softplus=nn.Softplus()
+        self.softplus = nn.Softplus(beta=10)
         
         
         self.graph_type=graph_type
