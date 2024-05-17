@@ -147,5 +147,8 @@ train-cold-start:
 		--loglevel 3 \
 		--device $(DEVICE)
 
+plot-hot-n-cold:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/plotting/plot_hot_n_cold.py
+
 plot-frob-errors:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/plotting/plot_frob_errors.py
