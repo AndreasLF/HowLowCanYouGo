@@ -35,7 +35,8 @@ def get_data_from_wandb(data="Cora", model_class="L2Model", loss_fn=["LogisticLo
     filters = {
         "config.data": data,
         "config.model_class": model_class,
-        "config.loss_fn": {"$in": loss_fn}
+        "config.loss_fn": {"$in": loss_fn},
+        "tags": {"$ne": "cold_start"} # exclude cold_start runs
     }    
     if start_date:
         filters["created_at"] = {"$gt": start_date}
@@ -76,7 +77,7 @@ if __name__ == "__main__":
     frob_error_norms, batch_sizes = get_data_from_wandb(data=data, model_class=model, loss_fn=loss_fn, start_date=start_date, eval_recon_freq=eval_recon_freq)
 
 
-# %%
+    # %%
     import matplotlib.pyplot as plt
     from cycler import cycler
     from graph_embeddings.plotting.plotter import PaperStylePlotter
@@ -108,7 +109,10 @@ if __name__ == "__main__":
         cols = 3  # Number of columns in the grid
         rows = (n_ranks + cols - 1) // cols  # Calculate rows needed
 
-        fig, axes = plt.subplots(rows, cols, figsize=(15, 10))
+        # get figsize from rcparams
+        figsize = plt.rcParams['figure.figsize']
+
+        fig, axes = plt.subplots(rows, cols, figsize=(figsize[0]*1.5, figsize[1]*2))
         axes = axes.flatten()  # Flatten to easily iterate
 
 
