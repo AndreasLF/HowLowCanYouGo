@@ -91,12 +91,19 @@ def find_optimal_rank(min_rank: int,
                                     dataset_name=dataset_name,
                                     model_path=save_path, 
                                     wandb_logging=wandb_logging, 
+                                    learning_rate=0.1,
+                                    # learning_rate_hinge=1.,
+                                    learning_rate_hinge=0.1,
                                     search_state=search_state)
+        # is_fully_reconstructed = True
+        # model = torch.load("")
+        if is_fully_reconstructed:
+            save_path = save_path.replace('.pt', '_FR.pt')
         torch.save(model, save_path)
         
         svd_target = compute_svd_target(model)
 
-    if is_fully_reconstructed:
+    if not is_fully_reconstructed:
         print("Full reconstruction not found with random initialization")
         return -1 # ! -1 <=> no rank found
 
@@ -125,11 +132,14 @@ def find_optimal_rank(min_rank: int,
         save_path = make_model_save_path(dataset=dataset_name, rank=current_rank,results_folder=results_folder, exp_id=exp_id)
         is_fully_reconstructed = train(model, N1, N2, edges, 
                                        exp_id=exp_id, 
+                                    #    phase_epochs={1: 50, 2: 0, 3: phase_epochs[3]}, 
                                        phase_epochs=phase_epochs, 
                                        dataset_name=dataset_name, 
                                        model_path=save_path, 
                                        wandb_logging=wandb_logging,
                                        search_state=search_state)
+        if is_fully_reconstructed:
+            save_path = save_path.replace('.pt', '_FR.pt')
         torch.save(model, save_path)
 
         # Check if the reconstruction is within the threshold

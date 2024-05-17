@@ -28,6 +28,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 from sklearn.neighbors import KDTree
 
+
 if device.type=='cuda':
     print('Running on GPU')
 
@@ -97,13 +98,13 @@ class LSM(nn.Module,Tree_kmeans_recursion,Create_missing_data,Spectral_clusterin
            
         self.first_centers=torch.randn(int(torch.round(torch.log(torch.tensor(input_size_1).float()))),latent_dim,device=device)
       
-        spectral_centroids_to_z,spectral_centroids_to_w=self.spectral_clustering()
+        # spectral_centroids_to_z,spectral_centroids_to_w=self.spectral_clustering()
        
-        self.latent_z=nn.Parameter(spectral_centroids_to_z)
-        self.latent_w=nn.Parameter(spectral_centroids_to_w)
+        # self.latent_z=nn.Parameter(spectral_centroids_to_z)
+        # self.latent_w=nn.Parameter(spectral_centroids_to_w)
        
-        # self.latent_z=nn.Parameter(torch.randn(self.input_size_1,self.latent_dim))
-        # self.latent_w=nn.Parameter(torch.randn(self.input_size_2,self.latent_dim))
+        self.latent_z=nn.Parameter(torch.randn(self.input_size_1,self.latent_dim))
+        self.latent_w=nn.Parameter(torch.randn(self.input_size_2,self.latent_dim))
         # self.gamma=nn.Parameter(torch.randn(self.input_size_1,device=device))
        
         # self.alpha=nn.Parameter(torch.randn(self.input_size_2,device=device))
@@ -192,48 +193,18 @@ class LSM(nn.Module,Tree_kmeans_recursion,Create_missing_data,Spectral_clusterin
             
         return log_likelihood_sparse
     
-    def final_analytical(self,i_link,j_link,i_non_link,j_non_link,hinge=True):
-        #i_link=self.sparse_i_idx
-        #j_link=self.sparse_j_idx
-
-        
-        if hinge:
-            with torch.no_grad():
-                mask1=((self.pdist(self.latent_z[i_link],self.latent_w[j_link]))>self.bias).long()
-                mask2=(self.pdist(self.latent_z[i_non_link],self.latent_w[j_non_link])<=self.bias).long()
-        block_pdist_an=self.pdist(self.latent_z[i_link],self.latent_w[j_link])+1e-08
-        block_pdist_non=self.pdist(self.latent_z[i_non_link],self.latent_w[j_non_link])+1e-08
-
-                
-        ## Block kmeans analytically#########################################################################################################
-                
-        lambda_block_an=-block_pdist_an+self.bias
-        lambda_block_non=-block_pdist_non+self.bias
-
-        if self.link_function=='EXP':
-
-            an_lik_an=torch.exp(lambda_block_an)
-            an_lik_non=torch.exp(lambda_block_non)
-
-            
-        elif self.link_function=='SOFTPLUS':
-
-            an_lik_an=self.softplus(lambda_block_an)
-            an_lik_non=self.softplus(lambda_block_non)
-
-            
+    def final_analytical(self,i_link,j_link,i_non_link,j_non_link,hinge=True,margin=False):
+        block_pdist_an=self.pdist(self.latent_z[i_link],self.latent_w[j_link])
+        block_pdist_non=self.pdist(self.latent_z[i_non_link],self.latent_w[j_non_link])
+        if margin:
+            h1=1-(self.bias-block_pdist_an)
+            h2=1+(self.bias-block_pdist_non)
         else:
-            raise ValueError('Invalid link function choice')
-        z_pdist=(((self.latent_z[i_link]-self.latent_w[j_link]+1e-08)**2).sum(-1))**0.5
-
-        logit_u=-z_pdist+self.bias
-        if hinge:
-            log_likelihood_sparse=(mask1*(logit_u-an_lik_an)).sum()-(mask2*an_lik_non).sum()
-        else:
-            log_likelihood_sparse=(logit_u-an_lik_an).sum()-an_lik_non.sum()
-
-
-        return log_likelihood_sparse
+            h1=-(self.bias-block_pdist_an)
+            h2=+(self.bias-block_pdist_non)
+        h_loss=(torch.clamp(h1, min=0).sum()+torch.clamp(h2, min=0).sum())
+ 
+        return -h_loss
     
     
     
@@ -327,11 +298,6 @@ def check_reconctruction_analytical(edges,Z,W,beta,N1,N2):
         elements=((s1-bool_m)!=0).sum()
     return (elements)/(N1*(N2-1)),elements
 
-    
-# TODO
-# [] 
-# [] 
-# [] 
 
 
 def create_model(dataset, latent_dim, link_function = "SOFTPLUS", device='cpu'):
@@ -430,6 +396,8 @@ def train(model,
             last_hbdm_loss = loss.detach().cpu().item()
             metrics["hbdm_loss"] = last_hbdm_loss
         else: # ! PHASE 2
+            # TODO? reconstruction check based on size of edge list before going to phase 2
+            # i.e. num_elements <= |edge_list|*log(|edge_list|)
             if epoch == phase_epochs[1]:
                 print(f'PHASE 2: Running HBDM and Hinge loss, for every HBDM iteration running {kd_tree_freq} iterations for the hinge loss')
                 phase_str = "PHASE 2"
@@ -511,22 +479,21 @@ def train(model,
         
         # scheduler.step()
         if epoch%kd_tree_freq==0: # ! evalute every 5 or 25? etc.
-            if epoch%kd_tree_freq==0:
-                percentage,num_elements,active=check_reconctruction(edges,model.latent_z,model.latent_w,model.bias,N1,N2)
-                i_link,j_link=active.indices()[:,active.values()==1]
+            percentage,num_elements,active=check_reconctruction(edges,model.latent_z,model.latent_w,model.bias,N1,N2)
+            i_link,j_link=active.indices()[:,active.values()==1]
 
-                i_non_link,j_non_link=active.indices()[:,active.values()==-1]
-                mask=i_non_link!=j_non_link
-                i_non_link=i_non_link[mask]
-                j_non_link=j_non_link[mask]
+            i_non_link,j_non_link=active.indices()[:,active.values()==-1]
+            mask=i_non_link!=j_non_link
+            i_non_link=i_non_link[mask]
+            j_non_link=j_non_link[mask]
 
-                if num_elements==0: # ! PERFECT RECONSTRUCTION
-                    print('Total reconstruction achieved!')
-                    save_path = model_path.replace('.pt', '_FR.pt')
-                    if wandb_logging:
-                        wandb.config.update({'full_reconstruction': True, "model_path":save_path})
-                        wandb.finish()
-                    return True
+            if num_elements==0: # ! PERFECT RECONSTRUCTION
+                print('Total reconstruction achieved!')
+                save_path = model_path.replace('.pt', '_FR.pt')
+                if wandb_logging:
+                    wandb.config.update({'full_reconstruction': True, "model_path":save_path})
+                    wandb.finish()
+                return True
                 
         pbar.set_description(f"[{phase_str}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
         metrics["misclassified_dyads_perc"] = percentage.detach().cpu().item()*100
