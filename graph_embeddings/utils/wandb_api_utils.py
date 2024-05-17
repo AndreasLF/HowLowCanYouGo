@@ -7,6 +7,16 @@ class WANDbAPIUtils:
         self.api = wandb.Api()
         self.runs = self.api.runs(path=project_name)
 
+    def get_exp_runs(self, exp_id):
+        runs = self.runs        
+        matching_runs = [run for run in runs if run.config.get("exp_id") == exp_id]
+
+        return matching_runs
+
+    def tag_run(self, run, tag):
+        print(f"Tagging run {run.id}")
+        run.tags = [tag]
+
     def tag_best_rank(self, exp_id):
         runs = self.runs
 

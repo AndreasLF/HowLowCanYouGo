@@ -38,13 +38,13 @@ datasets:
 run_experiments:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/run_experiments.py $(ARGS)
 
-DEVICE = cpu
+DEVICE = cuda
 RANK = 32
 LR = 0.2
 EPOCHS = 10_000
 DATASET = Planetoid/Cora
-BATCHING_TYPE = casecontrol
-BATCH_SIZE_PERCENTAGE = 0.1 # batch = full adj
+BATCHING_TYPE = random
+BATCH_SIZE_PERCENTAGE = 1.0 # batch = full adj
 # BATCHING_TYPE = random
 # BATCH_SIZE_PERCENTAGE = 1.0 # batch = full adj
 RECONS_CHECK = frob
@@ -66,6 +66,10 @@ train-ll2:
 train-lpca:
 	$(TRAIN_RANDOM) \
 		--model-type PCA --loss-type logistic \
+		--save-ckpt results/lpca.pt
+train-leig:
+	$(TRAIN_RANDOM) \
+		--model-type LatentEigen --loss-type logistic \
 		--save-ckpt results/lpca.pt
 
 train-hl2:
@@ -108,5 +112,17 @@ profile:
 #################################################################################
 # Plotting                                                                      #
 #################################################################################
+
+COLD_START_RANK = 40
+
+train-cold-start: 
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train_coldstart.py \
+		--rank $(COLD_START_RANK) \
+		--experiment Pubmed1 \
+		--model-type L2 \
+		--loss-type logistic\
+		--loglevel 3 \
+		--device $(DEVICE)
+
 plot-frob-errors:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/plotting/plot_frob_errors.py
