@@ -40,14 +40,14 @@ run_experiments:
 
 DEVICE = cuda
 RANK = 32
-LR = 0.2
+LR = 1.0
 EPOCHS = 10_000
 DATASET = Planetoid/Cora
+# BATCHING_TYPE = casecontrol
+# BATCH_SIZE_PERCENTAGE = 0.1 # batch = full adj
 BATCHING_TYPE = random
 BATCH_SIZE_PERCENTAGE = 1.0 # batch = full adj
-# BATCHING_TYPE = random
-# BATCH_SIZE_PERCENTAGE = 1.0 # batch = full adj
-RECONS_CHECK = frob
+RECONS_CHECK = both
 
 TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
 		--rank $(RANK) \
@@ -94,8 +94,31 @@ train-ppca:
 		--model-type PCA --loss-type poisson \
 		--save-ckpt results/ppca.pt
 
-examples:
-	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/examples.py
+
+PLOT_BETA = True
+
+example-1:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/examples.py \
+		single \
+		--example 1 --l2-rank 1 \
+		--N 50 --num-blocks 10 --plot-beta-radius $(PLOT_BETA)
+example-2:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/examples.py \
+		single \
+		--example 2 --l2-rank 2 \
+		--N 50 --num-blocks 10 --plot-beta-radius $(PLOT_BETA)
+example-ch2020-easy:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/examples.py \
+		single \
+		--example ch2020 --l2-rank 2 \
+		--N 15 --num-blocks 5 --plot-beta-radius $(PLOT_BETA)
+example-ch2020-hard:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/examples.py \
+		multiple \
+		--example ch2020 --l2-rank 2 \
+		--N 51 --num-blocks 17 --plot-beta-radius $(PLOT_BETA)
+
+
 
 get_stats:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/make_stats.py --print-latex

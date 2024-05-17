@@ -59,7 +59,7 @@ class Trainer:
         logits[logits >= self.thresh] = 1.
         logits[logits < self.thresh] = 0.
 
-        # Diagonal elements (self-loops) are not considered
+        # Diagonal elements (self-loops) are not considered # TODO - is this valid?
         logits.fill_diagonal_(0)
         A.fill_diagonal_(0)
 
@@ -210,8 +210,8 @@ class Trainer:
                             with torch.no_grad():
                                 edge_index_from_neighbors = get_edge_index_embeddings(model.X, model.Y, model.beta)
                                 is_fully_reconstructed, frac_correct = equals_set(edge_index_from_neighbors, 
-                                                                                #   self.dataloader.data.edge_index,         # ? normal edge_index
-                                                                                  self.dataloader.edge_index_with_selfloops, # ? edge_index augmented with selfloops
+                                                                                  self.dataloader.data.edge_index,         # ? normal edge_index
+                                                                                #   self.dataloader.edge_index_with_selfloops, # ? edge_index augmented with selfloops
                                                                                   return_frac=True)
                         
                             # TODO testing
