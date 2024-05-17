@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Check if an experiment name was provided
-if [ "$#" -ne 1 ] && [ "$#" -ne 3 ]; then
-    echo "Usage: $0 DATA [MIN_RANK MAX_RANK]"
+if [ "$#" -ne 1 ] && [ "$#" -ne 3 ] && [ "$#" -ne 6 ]; then
+    echo "Usage: $0 DATA [MIN_RANK MAX_RANK [PHASE1_EPOCHS PHASE2_EPOCHS PHASE3_EPOCHS]]"
     exit 1
 fi
 
@@ -27,9 +27,18 @@ if [ "$#" -eq 3 ]; then
 
     # Assign the loss and model types to variables
     RUN_EXPERIMENTS_ARGS="--device cuda --dataset ${DATA} --min ${MIN_RANK} --max ${MAX_RANK} --wandb"
-else 
+elif [ "$#" -eq 6 ]; then
+    MIN_RANK="$2"
+    MAX_RANK="$3"
+    PHASE1_EPOCHS="$4"
+    PHASE2_EPOCHS="$5"
+    PHASE3_EPOCHS="$6"
+
+    RUN_EXPERIMENTS_ARGS="--device cuda --dataset ${DATA} --min ${MIN_RANK} --max ${MAX_RANK} --phase1 ${PHASE1_EPOCHS} --phase2 ${PHASE2_EPOCHS} --phase3 ${PHASE3_EPOCHS} --wandb"
+else
     RUN_EXPERIMENTS_ARGS="--device cuda --dataset ${DATA} --wandb"
 fi
+
 
 # Replace placeholders in the template with actual environment variable values and the experiment name
 sed -e "s|\${VENV_PATH}|$VENV_PATH|g" \
@@ -44,7 +53,7 @@ sed -e "s|\${VENV_PATH}|$VENV_PATH|g" \
     -e "s|\${RUN_EXPERIMENTS_ARGS}|$RUN_EXPERIMENTS_ARGS|g" \
     "$JOB_SCRIPT_TEMPLATE" > "$TEMP_JOB_SCRIPT"
 
-Submit the job
+# Submit the job
 bsub < "$TEMP_JOB_SCRIPT"
 
 # Optionally, remove the temporary job script after submission
