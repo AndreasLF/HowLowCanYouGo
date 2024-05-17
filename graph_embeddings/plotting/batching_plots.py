@@ -2,8 +2,26 @@
 from graph_embeddings.utils.config import Config
 import wandb
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor
 
-def get_data_from_wandb(data="Cora", model_class="L2Model", loss_fn="LogisticLoss", start_date=None):
+def fetch_run_data(run):
+    batch_size = run.config.get("batch_size")
+    batch_type = run.config.get("batch_type")
+    rank = run.config.get("rank")
+    
+    history_df = run.history()
+    frobs = history_df["frob_error_norm"]
+    epochs = history_df["epoch"]
+
+    # Check the epoch differences
+    if len(epochs) > 1:
+        epoch_diff = [epochs[i+1] - epochs[i] for i in range(len(epochs)-1)]
+        if any([diff != eval_recon_freq for diff in epoch_diff]):
+            return None
+
+    return rank, (batch_type, batch_size), (list(epochs), list(frobs))
+
+def get_data_from_wandb(data="Cora", model_class="L2Model", loss_fn=["LogisticLoss", "CaseControlLogisticLoss"], start_date=None, eval_recon_freq=20):
         
     api = wandb.Api()
 
@@ -12,38 +30,39 @@ def get_data_from_wandb(data="Cora", model_class="L2Model", loss_fn="LogisticLos
 
     print("Fetching runs...")
     # filter on all runs in the project
-    runs = api.runs(path=project_name)
 
-    # data should be = Cora, model_class = L2, rank = 6
-    print("Filtering runs...")
-    if start_date == None:
-        matching_runs = [run for run in tqdm(runs) if run.config.get("data") == data and run.config.get("model_class") == model_class]
-    else: 
-        matching_runs = [run for run in tqdm(runs) if run.config.get("data") == data and run.config.get("model_class") == model_class and run.created_at > start_date]
+    # Define the filters for the config parameters
+    filters = {
+        "config.data": data,
+        "config.model_class": model_class,
+        "config.loss_fn": {"$in": loss_fn}
+    }    
+    if start_date:
+        filters["created_at"] = {"$gt": start_date}
+    matching_runs = api.runs(path=project_name, filters=filters)
 
     # get all unique batch_size values
     batch_sizes = set([run.config.get("batch_size") for run in matching_runs])
 
 
     print("Fetching data on each run...")
+
     frob_error_norms = {}
-    for run in tqdm(matching_runs):
-        batch_size = run.config.get("batch_size")
-        batch_type = run.config.get("batch_type")
-        rank = run.config.get("rank")
-        if rank not in frob_error_norms:
-            frob_error_norms[rank] = {}
-        if (batch_type, batch_size) not in frob_error_norms[rank]:
-            frob_error_norms[rank][(batch_type, batch_size)] = []
 
-        # append frob_error_norm history
-        history_df = run.history()
-        # get the epcoh column and frob_error_norm column
+    with ThreadPoolExecutor() as executor:
+        futures = {executor.submit(fetch_run_data, run): run.id for run in matching_runs}
+        for future in tqdm(futures):
+            result = future.result()
+            if result is None:
+                continue
+            rank, batch_info, frob_data = result
+            if rank not in frob_error_norms:
+                frob_error_norms[rank] = {}
+            if batch_info not in frob_error_norms[rank]:
+                frob_error_norms[rank][batch_info] = []
+            frob_error_norms[rank][batch_info].append(frob_data)
 
-        frobs = history_df["frob_error_norm"]
-        epochs = history_df["epoch"]
-
-        frob_error_norms[rank][(batch_type, batch_size)].append((list(epochs), list(frobs)))
+    print("Data fetching complete.")
 
     return frob_error_norms, batch_sizes
 # %%
@@ -51,9 +70,10 @@ def get_data_from_wandb(data="Cora", model_class="L2Model", loss_fn="LogisticLos
 if __name__ == "__main__":
     model = "L2Model"
     data = "PubMed"
-    loss_fn = "LogisticLoss"
-    start_date = "2024-05-05" # NOTE V2 of experiments, no diagonal
-    frob_error_norms, batch_sizes = get_data_from_wandb(data=data, model_class=model, loss_fn=loss_fn, start_date=start_date)
+    loss_fn = ["LogisticLoss", "CaseControlLogisticLoss"]
+    eval_recon_freq = 20
+    start_date = "2024-05-17" # NOTE V2 of experiments, no diagonal
+    frob_error_norms, batch_sizes = get_data_from_wandb(data=data, model_class=model, loss_fn=loss_fn, start_date=start_date, eval_recon_freq=eval_recon_freq)
 
 
 # %%
@@ -106,11 +126,11 @@ if __name__ == "__main__":
 
                 max_len = max(len(y) for _, y in value_list)
 
-
-
                 color = colors_dict[unique_tuple]
                 linestyle = linestyles_dict[unique_tuple]
                 all_y_values = []
+                
+                longest_epoch_list = []
 
                 for (epoch_list_x, loss_y) in value_list:
                     # ax.plot(epoch_list_x, loss_y, color=color, alpha=0.5)
@@ -118,20 +138,23 @@ if __name__ == "__main__":
                     # update max epochs
                     max_epocs = max(max_epocs, max(epoch_list_x))
 
+                    # update longest epoch list
+                    longest_epoch_list = epoch_list_x if len(epoch_list_x) > len(longest_epoch_list) else longest_epoch_list
 
+                    ax.plot(epoch_list_x, loss_y, color=color, alpha=0.3, linestyle=linestyle)
+                    
                     padded_loss_y = pad_list(loss_y, max_len)
                     padded_epoch_x = pad_list(epoch_list_x, max_len)
-                    ax.plot(padded_epoch_x, padded_loss_y, color=color, alpha=0.2, linestyle=linestyle)
-                    all_y_values.append(padded_loss_y)
+                    all_y_values.append(np.array(padded_loss_y))
                 # Calculate and plot the mean
                 # mean_y = np.mean(all_y_values, axis=0)
                 # ax.plot(epoch_list_x, mean_y, color=color, linewidth=2, label=f'{unique_tuple} mean' if i == 0 else "")
 
                 # Calculate and plot the mean
-                mean_y = np.nanmean(all_y_values, axis=0)
 
+                mean_y = np.nanmean(np.array(all_y_values), axis=0)
                 lab = "Random Node Sampling (10%)" if unique_tuple[0] == "RandomNodeDataLoader" and unique_tuple[1] != 19717 else "Negative Sampling (10%)" if unique_tuple[0] == "CaseControlDataLoader" else "Full dataset"
-                ax.plot(padded_epoch_x, mean_y, color=color, linewidth=1, label=lab, linestyle=linestyle)
+                ax.plot(longest_epoch_list, mean_y, color=color, label=lab, linestyle=linestyle)
                 
             ax.set_xlabel('Epoch')
             ax.set_ylabel('Frob error norm')
@@ -146,75 +169,11 @@ if __name__ == "__main__":
         for ax in axes:
             ax.set_xlim([0, max_epocs])
 
+        # plot title 
+        fig.suptitle(f"Frobenius Errors for different batch types at all the ranks in the search\n({data}, {model})", fontsize=16)
         plt.tight_layout()
+
         plt.show()
-
-    # import matplotlib.pyplot as plt
-    # from cycler import cycler
-    # from graph_embeddings.plotting.plotter import PaperStylePlotter
-    # import numpy as np
-
-    # with PaperStylePlotter().apply():
-    #     fig, ax = plt.subplots()
-
-    #     colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
-    #     linestyles = plt.rcParams['axes.prop_cycle'].by_key()['linestyle']
-
-    #     colors = [colors[0], colors[5]]
-
-    #     global_longest_epoch_list = []
-
-    #     for b, batch_size in enumerate(batch_sizes):
-
-    #         color = colors[b]
-    #         linestyle = linestyles[b]
-
-    #         frob_error_norms_list = frob_error_norms[batch_size]
-    #         epochs_list = [frob_error_norms_list[i][0] for i in range(len(frob_error_norms_list))]
-    #         frobs_list = [frob_error_norms_list[i][1] for i in range(len(frob_error_norms_list))]
-
-    #         max_length = max(len(frobs) for frobs in frobs_list)
-
-    #         # Pad frobenius errors to have the same length
-    #         padded_frobs_list = np.array([np.pad(frobs, (0, max_length - len(frobs)), 'constant', constant_values=np.nan) for frobs in frobs_list])
-
-    #         # Calculate mean and standard deviation ignoring NaN
-    #         mean_frobs = np.nanmean(padded_frobs_list, axis=0)
-    #         std_frobs = np.nanstd(padded_frobs_list, axis=0)
-
-    #         # Plot each individual run with lower opacity
-    #         for epochs, frobs in zip(epochs_list, frobs_list):
-    #             ax.plot(epochs, frobs, color=color, linestyle=linestyle, alpha=0.5, linewidth=0.5)
-
-    #         # Plot mean line and fill the confidence area around the mean
-    #         # get longest epoch list
-    #         longest_epoch_list = epochs_list[np.argmax([len(epochs) for epochs in epochs_list])]
-
-    #         # get global longest epoch list
-    #         global_longest_epoch_list = longest_epoch_list if len(longest_epoch_list) > len(global_longest_epoch_list) else global_longest_epoch_list
-
-
-    #         label = f"{batch_size} (full)" if batch_size == max(batch_sizes) else f"{batch_size}"
-    #         ax.plot(longest_epoch_list, mean_frobs, label=label, color=color, linestyle=linestyle, linewidth=1)
-
-    #     ax.set_title(f"Frobenius Errors at Different Batch Sizes\n({data}, Rank {rank}, {model})")
-    #     ax.set_xlabel("Epoch")
-    #     ax.set_ylabel("Frobenius Error")
-    #     ax.legend(title="Batch Size Mean")
-
-    #     # max from global longest epoch list
-    #     max_epoch = max(global_longest_epoch_list)+101
-    #     ticks = np.arange(0, max_epoch, 5000)
-    #     # replace 0 with 100 
-    #     ticks[0] = 100
-    #     # set x-ticks to max epoch
-    #     ax.set_xticks(ticks)
-
-    #     # save figure 
-    #     fig_name = "frob_error_norms"
-    #     print("Saving figure to: ", fig_name)
-    #     plt.show()
-    #     PaperStylePlotter().save_fig(fig, fig_name)
-
+        PaperStylePlotter().save_fig(fig, "batching_frob_error_norms")
 
 # %%
