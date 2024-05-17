@@ -429,7 +429,8 @@ def train(model,
                     optimizer.step()  # update the weights
                 last_hinge_loss = loss.detach().cpu().item()
                 metrics["hinge_loss"] = last_hinge_loss
-
+                metrics["misclassified_dyads_perc"] = percentage.detach().cpu().item()*100
+                metrics["misclassified_dyads"] = num_elements
 
             # if epoch % 100 == 0:
 
