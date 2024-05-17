@@ -77,11 +77,12 @@ class Euclidean_Kmeans():
             collapse_control_avg_radius=collapse_control_avg_radius.index_add(0, full_prev_cl, 0.5*self.aux_distance[torch.arange(self.aux_distance.shape[0],device=self.device),local_idx])
             collapse_control_avg_radius=(collapse_control_avg_radius/assigned_points)[centroids_split]
             self.condensed_centers=torch.where(collapse_control_avg_radius<(self.Dim**0.5)*self.cond_control)[0]
-            if self.condensed_centers.shape[0]>0:
-                self.collapse_flag=True
-                self.collapses=torch.where(self.previous_cl_idx.unsqueeze(-1)==self.condensed_centers)
-                self.collapsed_nodes=self.collapses[0]
-                self.collapsed_cnts=self.condensed_centers[self.collapses[1]]
+            # ! commented out due to INT_MAX stuff
+            #! if self.condensed_centers.shape[0]>0:
+            #!     self.collapse_flag=True
+            #!     self.collapses=torch.where(self.previous_cl_idx.unsqueeze(-1)==self.condensed_centers)
+            #!     self.collapsed_nodes=self.collapses[0]
+            #!     self.collapsed_cnts=self.condensed_centers[self.collapses[1]]
                
         
 

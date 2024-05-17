@@ -179,7 +179,21 @@ class Tree_kmeans_recursion():
 
                 
             
-            model=Euclidean_Kmeans(nzetas=self.number_of_remaining_zetas,cond_control=self.cond_control,k_centers=2*int(splited_cl_ids_i.shape[0]),dimensions=bipartite_data[self.mask_split].shape,split_mask=self.mask_split,previous_cl_idx=cl_idx,full_prev_cl=full_prev_cl,prev_centers=centers.detach()[self.splitting_criterion],full_prev_centers=centers.detach(),centroids_split=self.splitting_criterion,assigned_points=assigned_points,aux_distance=aux_distance,local_idx=local_idx,initialization=0,device=self.device)
+            model=Euclidean_Kmeans(nzetas=self.number_of_remaining_zetas,
+                                   cond_control=self.cond_control,
+                                   k_centers=2*int(splited_cl_ids_i.shape[0]),
+                                   dimensions=bipartite_data[self.mask_split].shape,
+                                   split_mask=self.mask_split,
+                                   previous_cl_idx=cl_idx,
+                                   full_prev_cl=full_prev_cl,
+                                   prev_centers=centers.detach()[self.splitting_criterion],
+                                   full_prev_centers=centers.detach(),
+                                   centroids_split=self.splitting_criterion,
+                                   assigned_points=assigned_points,
+                                   aux_distance=aux_distance,
+                                   local_idx=local_idx,
+                                   initialization=0,
+                                   device=self.device)
             sparse_mask,cl_idx,local_idx,aux_distance,sparse_mask_z,sparse_mask_w=model.Kmeans_run(deepcopy(bipartite_data.detach()[self.mask_split]),bipartite_data[self.mask_split])
             self.total_sub_centroids.append(model.centroids.detach())
             full_prev_cl=cl_idx
