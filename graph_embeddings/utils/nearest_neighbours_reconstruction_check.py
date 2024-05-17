@@ -26,13 +26,13 @@ def get_edge_index_embeddings(X, Y, beta):
     targets_filtered = targets_flattened[valid_mask]
 
     # Remove self-loops - # ! better in a final version, but it is more compatible with our codebase to add the selfloops when retrieving edge indices from dataloader
-    # self_loop_mask = sources_filtered != targets_filtered
-    # sources_final = sources_filtered[self_loop_mask]
-    # targets_final = targets_filtered[self_loop_mask]
+    self_loop_mask = sources_filtered != targets_filtered
+    sources_final = sources_filtered[self_loop_mask]
+    targets_final = targets_filtered[self_loop_mask]
 
     # Construct the edge index matrix
-    # edge_index_from_neighbors = torch.stack((sources_final, targets_final), dim=0)
-    edge_index_from_neighbors = torch.stack((sources_filtered, targets_filtered), dim=0)
+    edge_index_from_neighbors = torch.stack((sources_final, targets_final), dim=0)
+    # edge_index_from_neighbors = torch.stack((sources_filtered, targets_filtered), dim=0)
 
     return edge_index_from_neighbors
 
