@@ -183,7 +183,7 @@ class Trainer:
                 epoch_loss = sum(losses) / len(losses)
 
 
-                if (epoch % eval_recon_freq == 0) and (epoch != 0): # ! only check every {x}'th epoch
+                if (epoch % eval_recon_freq == 0): # ! only check every {x}'th epoch
                     last_recons_check_epoch = epoch
                     recons_report_str = ""
 
