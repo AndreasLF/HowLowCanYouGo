@@ -45,11 +45,13 @@ class HingeLoss(BaseLoss):
                  A_hat: torch.Tensor, 
                  adj_s: torch.Tensor
                  ):
-        h1 = 1 - adj_s*A_hat
+        h1 = 0 - adj_s*A_hat
         h2 = self.zero if self.zero.shape == h1.shape else torch.zeros_like(h1)
         self.zero = h2
         h_loss = torch.max(h1, h2)
         h_loss.fill_diagonal_(0)
+
+        
         return h_loss.sum()
 
 class CaseControlHingeLoss(BaseLoss):
