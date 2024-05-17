@@ -494,6 +494,8 @@ def train(model,
                 if wandb_logging:
                     wandb.config.update({'full_reconstruction': True, "model_path":save_path})
                     wandb.finish()
+                    search_state.pop('wandb_id')
+                search_state.pop('epochs')
                 return True
                 
         pbar.set_description(f"[{phase_str}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
@@ -505,6 +507,8 @@ def train(model,
     if wandb_logging:
         wandb.config.update({"model_path": model_path})
         wandb.finish()
+        search_state.pop('wandb_id')
+    search_state.pop('epochs')
     return False
             
 
