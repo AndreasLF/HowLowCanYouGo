@@ -418,8 +418,14 @@ def train(model,
                 j_non_link = j_non_link[mask]
 
                 if num_elements == 0: # ! PERFECT RECONSTRUCTION
-                    torch.save(model.state_dict(), 'EE_model.pth')
                     print('Total reconstruction achieved')
+                    save_path = model_path.replace('.pt', '_FR.pt')
+                    if wandb_logging:
+                        wandb.config.update({'full_reconstruction': True, "model_path":save_path})
+                        wandb.finish()
+                        search_state.pop("wandb_id")
+                    search_state.pop("epochs")
+                    search_state.pop("phase")
                     return True
 
                 for j in range(5):
@@ -496,6 +502,8 @@ def train(model,
                     wandb.finish()
                     search_state.pop('wandb_id')
                 search_state.pop('epochs')
+                search_state.pop('phase')
+
                 return True
                 
         pbar.set_description(f"[{phase_str}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
@@ -509,6 +517,7 @@ def train(model,
         wandb.finish()
         search_state.pop('wandb_id')
     search_state.pop('epochs')
+    search_state.pop('phase')
     return False
             
 
