@@ -4,3 +4,4 @@ wandb
 
 jobscripts/env_vars.sh
 *.out
+*.ckpt
