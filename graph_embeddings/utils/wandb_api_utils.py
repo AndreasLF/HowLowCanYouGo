@@ -16,6 +16,7 @@ class WANDbAPIUtils:
     def tag_run(self, run, tag):
         print(f"Tagging run {run.id}")
         run.tags = [tag]
+        run.update()
 
     def tag_best_rank(self, exp_id):
         runs = self.runs
