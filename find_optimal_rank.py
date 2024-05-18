@@ -171,7 +171,7 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, default='Cora', help="Dataset (graph) to run search on for.")
     parser.add_argument("--load-ckpt", type=str, default=None, help="Specify which model state dict to initialize the search.")
     parser.add_argument("--phase1", type=int, default=1_000,  help="How many steps to run phase 1 for.")
-    parser.add_argument("--phase2", type=int, default=5_000,  help="How many steps to run phase 2 for.")
+    parser.add_argument("--phase2", type=int, default=0,  help="How many steps to run phase 2 for.")
     parser.add_argument("--phase3", type=int, default=10_000, help="How many steps to run phase 3 for.")
     parser.add_argument("--max", type=int, default=100, help="Max rank, i.e. upper bound of search range.")
     parser.add_argument("--min", type=int, default=1, help="Min rank, i.e. lower bound of search range.")

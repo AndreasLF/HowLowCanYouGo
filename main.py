@@ -488,6 +488,8 @@ def train(model,
 
     # TODO LR scheduler for hinge?
     optimizer_hinge = optim.Adam(model.parameters(), lr=learning_rate_hinge)
+    lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer_hinge, mode='min', factor=0.5, patience=50, verbose=True)
+    # lr_scheduler = None # comment out to use lr scheduling
     pbar = tqdm(range(search_state.get('cur_epoch', 0), phase_epochs[3] + 1))
     for epoch in pbar:
         metrics = {"epoch": phase_epochs[2] + epoch + 1}
@@ -506,6 +508,8 @@ def train(model,
         loss.backward() # backpropagate
         metrics["hinge_loss"] = last_hinge_loss
         optimizer_hinge.step() # update the weights
+        if lr_scheduler is not None:
+            lr_scheduler.step(loss.item())
         
         # scheduler.step()
         if epoch%kd_tree_freq==0: # ! evalute every 5 or 25? etc.
@@ -524,11 +528,12 @@ def train(model,
                     wandb.config.update({'full_reconstruction': True, "model_path":save_path})
                     wandb.finish()
                     search_state.pop('wandb_id')
-                search_state.pop('epochs')
+                search_state.pop('cur_epoch')
                 search_state.pop('phase')
 
                 return True
                 
+        # pbar.set_description(f"[{phase_str}] [LR = {lr_scheduler.last_lr()}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
         pbar.set_description(f"[{phase_str}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
         metrics["misclassified_dyads_perc"] = percentage.detach().cpu().item()*100
         metrics["misclassified_dyads"] = num_elements
@@ -539,7 +544,7 @@ def train(model,
         wandb.config.update({"model_path": model_path})
         wandb.finish()
         search_state.pop('wandb_id')
-    search_state.pop('epochs')
+    search_state.pop('cur_epoch')
     search_state.pop('phase')
     return False
             
