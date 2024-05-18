@@ -528,8 +528,8 @@ def train(model,
                     wandb.config.update({'full_reconstruction': True, "model_path":save_path})
                     wandb.finish()
                     search_state.pop('wandb_id')
-                search_state.pop('cur_epoch')
-                search_state.pop('phase')
+                if 'cur_epoch' in search_state.keys(): search_state.pop('cur_epoch')
+                if 'phase' in search_state.keys(): search_state.pop('phase')
 
                 return True
                 
@@ -544,8 +544,8 @@ def train(model,
         wandb.config.update({"model_path": model_path})
         wandb.finish()
         search_state.pop('wandb_id')
-    search_state.pop('cur_epoch')
-    search_state.pop('phase')
+        if 'cur_epoch' in search_state.keys(): search_state.pop('cur_epoch')
+        if 'phase' in search_state.keys(): search_state.pop('phase')
     return False
             
 
