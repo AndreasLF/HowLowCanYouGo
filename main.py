@@ -20,6 +20,7 @@ from missing_data import Create_missing_data
 CUDA = torch.cuda.is_available()
 from spectral_clustering import Spectral_clustering_init
 from sklearn import metrics
+from joblib import Parallel, delayed
 # from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
 import wandb
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -237,49 +238,71 @@ class LSM(nn.Module,Tree_kmeans_recursion,Create_missing_data,Spectral_clusterin
         return metrics.roc_auc_score(target.cpu().data.numpy(),rates.cpu().data.numpy()),metrics.auc(recall,precision)
     
 
+def radius_search(tree, query_point, radius):
+     indices = tree.query_radius([query_point], r=radius)[0]
+     count = len(indices)
+     return count, indices
+
     
 def check_reconctruction(edges,Z,W,beta,N1,N2):
     device = edges.device
 
-    Z_np=Z.detach().cpu().numpy()
-    W_np=W.detach().cpu().numpy()
-    beta_np=beta.detach().cpu().numpy()
+    Z_np=Z.detach().contiguous().cpu().numpy()
+    W_np=W.detach().contiguous().cpu().numpy()
+    beta_np=beta.detach().contiguous().cpu().numpy()
     X=np.concatenate((Z_np,W_np))
-
+ 
     node_i=torch.arange(N1)
    # node_j=torch.arange(N2)
+    # Parameters
+    leaf_size = int(4 * np.log(N1))
+    # Build KDTree
+    tree = KDTree(X, leaf_size=leaf_size)
+    # Define the combined radius search function
+
+    # Perform parallel radius searches for counts and indices
+    results = Parallel(n_jobs=-1, backend='loky')(
+        delayed(radius_search)(tree, X[i], beta_np) for i in range(N1)
+    )
+    # Separate the counts and indices from the results
+    counts, indeces = zip(*results)
+    counts = np.array(counts)
+    indeces = list(indeces) # Keep indices as a list of arrays
     
     
     tree = KDTree(X, leaf_size=int(4*np.log(N1)))
     counts= tree.query_radius(X, r=beta_np,count_only=True)  
     indeces=tree.query_radius(X, r=beta_np)  
-
+ 
+    tree = KDTree(X, leaf_size=int(4*np.log(N1)))
+    counts= tree.query_radius(X, r=beta_np,count_only=True)  
+    indeces=tree.query_radius(X, r=beta_np)  
+ 
     source_ind=torch.from_numpy(np.concatenate(indeces[0:N1])).to(device)
    # targets_ind=torch.from_numpy(np.concatenate(indeces[N1:]))
-    
     source_counts=torch.from_numpy(counts[0:N1]).to(device)
    # targets_counts=torch.from_numpy(counts[N1:])
-
+ 
     total_i=torch.repeat_interleave(node_i,source_counts)
    # total_j=torch.repeat_interleave(node_j,targets_counts)
-
+ 
     kd_indeces_i=torch.cat((total_i.unsqueeze(1),source_ind.unsqueeze(1)),1)
     #kd_indeces_j=torch.cat((total_j.unsqueeze(1),targets_ind.unsqueeze(1)),1)
-
+ 
     cleaned_kd_i=kd_indeces_i[kd_indeces_i[:,1]>=N1]
     cleaned_kd_i[:,1]=cleaned_kd_i[:,1]-N1
-    
     #cleaned_kd_j=kd_indeces_j[kd_indeces_j[:,1]<N1]
-
+ 
     active_set_edges=cleaned_kd_i.T
-
-    s1 = torch.sparse_coo_tensor(edges, torch.ones(edges.shape[1], device=device), (N1,N2)).coalesce()
+ 
+    s1 = torch.sparse_coo_tensor(edges, torch.ones(edges.shape[1]), (N1,N2), device=device).coalesce()
     mask=active_set_edges[0]!=active_set_edges[1]
     active_set_edges=active_set_edges[:,mask]
-    s2 = torch.sparse_coo_tensor(active_set_edges, torch.ones(active_set_edges.shape[1], device=device), (N1,N2)).coalesce()
+    s2 = torch.sparse_coo_tensor(active_set_edges, torch.ones(active_set_edges.shape[1]), (N1,N2), device=device).coalesce()
     overall_=(s1-s2).coalesce()
     elements=(overall_.values()!=0).sum()
     return (elements)/(N1*(N2-1)),elements,overall_
+    
 
 def check_reconctruction_analytical(edges,Z,W,beta,N1,N2):
     
