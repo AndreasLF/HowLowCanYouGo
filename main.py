@@ -350,7 +350,7 @@ def train(model,
           phase_epochs = {1: 1_000, 2: 5_000, 3: 10_000},
           kd_tree_freq = 5,
           learning_rate = 0.1,
-          learning_rate_hinge = 0.1,
+          learning_rate_hinge = 0.5,
           dataset_name = None,
           model_path = "notset",
           wandb_logging = True,
@@ -398,7 +398,7 @@ def train(model,
     phase_str = "PHASE 1"
     percentage, num_elements = torch.tensor(float('NaN')), torch.tensor(float('NaN'))
     last_hbdm_loss, last_hinge_loss = torch.tensor(float('NaN')), torch.tensor(float('NaN'))
-    pbar = tqdm(range(search_state.get('cur_epoch', 0), phase_epochs[2] + 1))
+    pbar = tqdm(range(search_state.get('cur_epoch', 0), phase_epochs[2]))
     for epoch in pbar:
         if search_state.get("phase", None) == 3: break # if starting form a checkpoint in phase 3
 
