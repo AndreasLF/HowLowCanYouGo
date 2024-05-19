@@ -41,6 +41,8 @@ def find_optimal_rank(min_rank: int,
     else:
         exp_id = str(uuid.uuid4())
 
+    print(f"exp_id:{exp_id}")
+
     lower_bound = min_rank
     upper_bound = max_rank
     optimal_rank = upper_bound  # Assume the worst case initially
@@ -115,9 +117,11 @@ def find_optimal_rank(min_rank: int,
             # 2. Perform SVD estimate from higher into lower rank approx.
             _,_,V = torch.svd_lowrank(svd_target, q=current_rank)
             X,Y = torch.chunk(svd_target, 2, dim=0)
+            # _bias = model.bias
             model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=current_rank, device=device)
             model.latent_z = torch.nn.Parameter(X@V, requires_grad=True)
             model.latent_w = torch.nn.Parameter(Y@V, requires_grad=True)
+            # model.bias = _bias
 
             del X; del Y; del V; del _;
 

@@ -348,6 +348,8 @@ def train(model,
           search_state = {}
           ):
     
+    stop_flag = True
+    stop_flag = False # ! keep this uncommented
     checkpoint_freq = 100
     # checkpoint_freq = 5
 
@@ -471,6 +473,7 @@ def train(model,
     edges = edges.to(device)
     model = model.to(device)
 
+    if phase_epochs[1] == 0 and stop_flag: pdb.set_trace() # ! if stop_flag is True, you can manually load a pretrained model for phase 3
     # ! save model after HBDM pre-training
     torch.save(model, f"HBDM_pretrained_model_{exp_id}.pt")
 
@@ -538,7 +541,11 @@ def train(model,
                 if 'phase' in search_state.keys(): search_state.pop('phase')
 
                 return True
-                
+
+            torch.save(model, f"HBDM_pretrained_model_epoch{epoch}_{exp_id}.pt")
+        
+        if phase_epochs[1] == 0 and stop_flag: pdb.set_trace() # ! if stop_flag is True, you can manually save a model that has trained for a bit in phase 3
+
         # pbar.set_description(f"[{phase_str}] [LR = {lr_scheduler.last_lr()}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
         pbar.set_description(f"[{phase_str}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
         
