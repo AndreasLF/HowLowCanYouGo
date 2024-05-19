@@ -150,5 +150,12 @@ train-cold-start:
 plot-hot-n-cold:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/plotting/plot_hot_n_cold.py
 
+
+plot-batching:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/plotting/batching_plots.py
+
 plot-frob-errors:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/plotting/plot_frob_errors.py
+
+hbdm-plot:
+	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/plotting/hbdm_plots.py $(ARGS)
