@@ -348,7 +348,7 @@ def train(model,
           search_state = {}
           ):
     
-    checkpoint_freq = 1_000
+    checkpoint_freq = 100
     # checkpoint_freq = 5
 
     torch.autograd.set_detect_anomaly(True)
@@ -470,9 +470,12 @@ def train(model,
     device = torch.device('cpu')
     edges = edges.to(device)
     model = model.to(device)
+
+    # ! save model after HBDM pre-training
+    torch.save(model, f"HBDM_pretrained_model_{exp_id}.pt")
+
     percentage,num_elements,active=check_reconctruction(edges,model.latent_z,model.latent_w,model.bias,N1,N2)
     print(f'Miss-classified percentage of total elements: {100*percentage}%, i.e. {num_elements} elements',)
-
 
     i_link,j_link=active.indices()[:,active.values()==1]
 
@@ -480,9 +483,6 @@ def train(model,
     mask=i_non_link!=j_non_link
     i_non_link=i_non_link[mask]
     j_non_link=j_non_link[mask]
-
-
-
     
     # ! LR scheduler for hinge loss
     optimizer_hinge = optim.Adam(model.parameters(), lr=learning_rate_hinge)
@@ -514,6 +514,12 @@ def train(model,
         # scheduler.step()
         if epoch%kd_tree_freq==0: # ! evalute every 5 or 25? etc.
             percentage,num_elements,active=check_reconctruction(edges, model.latent_z,model.latent_w,model.bias,N1,N2)
+
+            # ! log reconstruction metrics after every update
+            metrics["misclassified_dyads_perc"] = percentage.detach().cpu().item()*100
+            metrics["misclassified_dyads"] = num_elements
+            if wandb_logging: wandb.log(metrics)
+
             i_link,j_link=active.indices()[:,active.values()==1]
 
             i_non_link,j_non_link=active.indices()[:,active.values()==-1]
@@ -535,9 +541,7 @@ def train(model,
                 
         # pbar.set_description(f"[{phase_str}] [LR = {lr_scheduler.last_lr()}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
         pbar.set_description(f"[{phase_str}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
-        metrics["misclassified_dyads_perc"] = percentage.detach().cpu().item()*100
-        metrics["misclassified_dyads"] = num_elements
-        if wandb_logging: wandb.log(metrics)
+        
     
 
     if wandb_logging:
