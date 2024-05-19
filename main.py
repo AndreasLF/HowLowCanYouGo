@@ -268,21 +268,12 @@ def check_reconctruction(edges,Z,W,beta,N1,N2):
     counts, indeces = zip(*results)
     counts = np.array(counts)
     indeces = list(indeces) # Keep indices as a list of arrays
-    
-    
-    tree = KDTree(X, leaf_size=int(4*np.log(N1)))
-    counts= tree.query_radius(X, r=beta_np,count_only=True)  
-    indeces=tree.query_radius(X, r=beta_np)  
- 
-    tree = KDTree(X, leaf_size=int(4*np.log(N1)))
-    counts= tree.query_radius(X, r=beta_np,count_only=True)  
-    indeces=tree.query_radius(X, r=beta_np)  
  
     source_ind=torch.from_numpy(np.concatenate(indeces[0:N1])).to(device)
    # targets_ind=torch.from_numpy(np.concatenate(indeces[N1:]))
     source_counts=torch.from_numpy(counts[0:N1]).to(device)
    # targets_counts=torch.from_numpy(counts[N1:])
- 
+    
     total_i=torch.repeat_interleave(node_i,source_counts)
    # total_j=torch.repeat_interleave(node_j,targets_counts)
  
@@ -350,7 +341,7 @@ def train(model,
           phase_epochs = {1: 1_000, 2: 5_000, 3: 10_000},
           kd_tree_freq = 5,
           learning_rate = 0.1,
-          learning_rate_hinge = 0.5,
+          learning_rate_hinge = 0.1,
           dataset_name = None,
           model_path = "notset",
           wandb_logging = True,
@@ -474,6 +465,11 @@ def train(model,
     print(f'PHASE 3: Running Hinge loss only (building kdtree every {kd_tree_freq} iterations)')
     phase_str = "PHASE 3"
 
+    # ! set to CPU for hinge loss
+    torch.set_default_tensor_type('torch.FloatTensor') 
+    device = torch.device('cpu')
+    edges = edges.to(device)
+    model = model.to(device)
     percentage,num_elements,active=check_reconctruction(edges,model.latent_z,model.latent_w,model.bias,N1,N2)
     print(f'Miss-classified percentage of total elements: {100*percentage}%, i.e. {num_elements} elements',)
 
@@ -486,10 +482,14 @@ def train(model,
     j_non_link=j_non_link[mask]
 
 
-    # TODO LR scheduler for hinge?
+
+    
+    # ! LR scheduler for hinge loss
     optimizer_hinge = optim.Adam(model.parameters(), lr=learning_rate_hinge)
-    lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer_hinge, mode='min', factor=0.5, patience=50, verbose=True)
+    lr_patience = 50
+    lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer_hinge, mode='min', factor=0.5, patience=lr_patience, verbose=True)
     # lr_scheduler = None # comment out to use lr scheduling
+
     pbar = tqdm(range(search_state.get('cur_epoch', 0), phase_epochs[3] + 1))
     for epoch in pbar:
         metrics = {"epoch": phase_epochs[2] + epoch + 1}
@@ -501,19 +501,19 @@ def train(model,
             search_state['current_model'] = model.state_dict()
             torch.save(search_state, f'checkpoints/{dataset_name}_{exp_id}/EE_model_{epoch}.ckpt') # EED search state
                         
-        loss=-model.final_analytical(i_link, j_link, i_non_link, j_non_link)/N1
+        loss= - model.final_analytical(i_link, j_link, i_non_link, j_non_link)/N1
         last_hinge_loss = loss.detach().cpu().item()
     
         optimizer_hinge.zero_grad(set_to_none=True) # clear the gradients.   
         loss.backward() # backpropagate
         metrics["hinge_loss"] = last_hinge_loss
         optimizer_hinge.step() # update the weights
-        if lr_scheduler is not None:
+        if lr_scheduler is not None and epoch > lr_patience:
             lr_scheduler.step(loss.item())
         
         # scheduler.step()
         if epoch%kd_tree_freq==0: # ! evalute every 5 or 25? etc.
-            percentage,num_elements,active=check_reconctruction(edges,model.latent_z,model.latent_w,model.bias,N1,N2)
+            percentage,num_elements,active=check_reconctruction(edges, model.latent_z,model.latent_w,model.bias,N1,N2)
             i_link,j_link=active.indices()[:,active.values()==1]
 
             i_non_link,j_non_link=active.indices()[:,active.values()==-1]

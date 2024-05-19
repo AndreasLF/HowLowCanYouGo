@@ -93,7 +93,7 @@ def find_optimal_rank(min_rank: int,
                                     wandb_logging=wandb_logging, 
                                     learning_rate=0.1,
                                     # learning_rate_hinge=1.,
-                                    learning_rate_hinge=0.1,
+                                    learning_rate_hinge=0.25,
                                     search_state=search_state)
         # is_fully_reconstructed = True
         # model = torch.load("")
