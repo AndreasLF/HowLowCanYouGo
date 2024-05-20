@@ -6,7 +6,7 @@ Created on Thu Oct  1 13:47:48 2020
 """
 
 # Import all the packages
-import pdb
+# import pdb
 import os
 from tqdm import tqdm
 import torch
@@ -261,7 +261,9 @@ def check_reconctruction(edges,Z,W,beta,N1,N2):
     # Define the combined radius search function
 
     # Perform parallel radius searches for counts and indices
-    results = Parallel(n_jobs=-1, backend='loky')(
+    n_jobs = -1
+    # n_jobs = 16
+    results = Parallel(n_jobs=n_jobs, backend='loky')(
         delayed(radius_search)(tree, X[i], beta_np) for i in range(N1)
     )
     # Separate the counts and indices from the results
@@ -349,7 +351,7 @@ def train(model,
           ):
     
     stop_flag = True
-    stop_flag = False # ! keep this uncommented
+    # stop_flag = False # ! keep this uncommented
     checkpoint_freq = 100
     # checkpoint_freq = 5
 
@@ -385,6 +387,7 @@ def train(model,
 # ################################################################################################################################################################
     
     optimizer = optim.Adam(model.parameters(), learning_rate)  
+    optimizer_hinge = None
 
     model.scaling=0
     print(f'PHASE 1: Running HBDM for {phase_epochs[1]} iterations')
@@ -473,7 +476,12 @@ def train(model,
     edges = edges.to(device)
     model = model.to(device)
 
-    if phase_epochs[1] == 0 and stop_flag: pdb.set_trace() # ! if stop_flag is True, you can manually load a pretrained model for phase 3
+    if phase_epochs[1] == 0 and stop_flag: #pdb.set_trace() # ! if stop_flag is True, you can manually load a pretrained model for phase 3
+        # ? e.g. state = torch.load(STATE_PATH); model = state['model']; optimizer_hinge = state['optimizer']
+        STATE_PATH = "ckpt_com-amazon/d67f3c41-7ee7-44ea-b4f8-960ec9e9d4be/epoch40_state.pt"
+        print(f"Loading from {STATE_PATH}")
+        state = torch.load(STATE_PATH); model = state['model']; optimizer_hinge = state['optimizer']
+    
     # ! save model after HBDM pre-training
     torch.save(model, f"HBDM_pretrained_model_{exp_id}.pt")
 
@@ -488,8 +496,8 @@ def train(model,
     j_non_link=j_non_link[mask]
     
     # ! LR scheduler for hinge loss
-    optimizer_hinge = optim.Adam(model.parameters(), lr=learning_rate_hinge)
-    lr_patience = 50
+    optimizer_hinge = optimizer_hinge or optim.Adam(model.parameters(), lr=learning_rate_hinge)
+    lr_patience = 10
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer_hinge, mode='min', factor=0.5, patience=lr_patience, verbose=True)
     # lr_scheduler = None # comment out to use lr scheduling
 
@@ -541,10 +549,14 @@ def train(model,
                 if 'phase' in search_state.keys(): search_state.pop('phase')
 
                 return True
-
-            torch.save(model, f"HBDM_pretrained_model_epoch{epoch}_{exp_id}.pt")
+            
+            # if epoch % 25 == 0:
+            os.makedirs(f"ckpt_{dataset_name}/{exp_id}", exist_ok=True)
+            save_state = {"model": model, "optimizer": optimizer_hinge}
+            torch.save(save_state, f"ckpt_{dataset_name}/{exp_id}/epoch{epoch}_state.pt")
+            del save_state
         
-        if phase_epochs[1] == 0 and stop_flag: pdb.set_trace() # ! if stop_flag is True, you can manually save a model that has trained for a bit in phase 3
+        # if phase_epochs[1] == 0 and stop_flag: pdb.set_trace() # ! if stop_flag is True, you can manually save a model that has trained for a bit in phase 3
 
         # pbar.set_description(f"[{phase_str}] [LR = {lr_scheduler.last_lr()}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
         pbar.set_description(f"[{phase_str}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
@@ -568,4 +580,4 @@ if __name__ == '__main__':
     model, N1, N2, edges = create_model(f"{dataset_relpath}/{dataset}", latent_dim)
     is_reconstructed = train(model, N1, N2, edges)
     # torch.save(model, "")
-    pdb.set_trace()            
+    # pdb.set_trace()            
