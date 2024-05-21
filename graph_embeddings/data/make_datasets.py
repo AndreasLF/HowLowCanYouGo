@@ -80,6 +80,10 @@ def read_txt_dataset(files: List[str], name: str) -> List[Data]:
                              dtype=np.int64)
     edge_index = torch.from_numpy(edge_index.values).t()
 
+    if name in ["com-amazon","com-dblp","com-orkut","com-youtube"]:
+        # make the graph undirected
+        edge_index = torch.cat([edge_index, edge_index.flip(0)], dim=1)
+
     idx = torch.unique(edge_index.flatten())
     idx_assoc = torch.full((edge_index.max() + 1, ), -1, dtype=torch.long)
     idx_assoc[idx] = torch.arange(idx.size(0))
@@ -103,7 +107,7 @@ def process_wrapper(self):
             raw_dir = osp.join(raw_dir, filenames[0])
 
         raw_files = sorted([osp.join(raw_dir, f) for f in os.listdir(raw_dir)])
-        data_list = read_txt_dataset(raw_files, self.name[5:])
+        data_list = read_txt_dataset(raw_files, self.name.lower())
 
         if len(data_list) > 1 and self.pre_filter is not None:
             data_list = [data for data in data_list if self.pre_filter(data)]
