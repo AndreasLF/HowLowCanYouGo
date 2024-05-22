@@ -97,11 +97,17 @@ if __name__ == "__main__":
 
     # import matplotlib.pyplot as plt
     # grid of 7 pltos
-    fig, ax = plt.subplots(3, 3, figsize=(12, 8))
+    fig, ax = plt.subplots(2, 3, figsize=(12, 8))
     ax = ax.flatten()   # Flatten to easily iterate
 
 
-    for i, (rank, values) in enumerate(data_hot_start.items()):
+    i = 0
+    for j, (rank, values) in enumerate(data_hot_start.items()):
+
+        # skip plot if rank is 12. Just to make it fit in two rows. Point is still proven
+        if rank == 12:
+            continue
+
         epochs = values["data"]["epochs"]
         frobs = values["data"]["frob"]
 
@@ -128,13 +134,9 @@ if __name__ == "__main__":
 
         # make tick text smaller
         ax[i].tick_params(axis='both', which='major', labelsize=8)
+        i += 1
 
     plt.tight_layout()
-
-    # remove last two plots 
-    ax[-1].axis("off")
-    ax[-2].axis("off")
-
 
     plt.savefig("figures/hot_n_cold_start.pdf", format="pdf")
 

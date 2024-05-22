@@ -45,7 +45,10 @@ if __name__ == "__main__":
     # =================== Get the data ===================
     exp_id_dict = {
         "Citeseer": "a2447153-cacd-417b-b1a2-136848e4aea1",
-        "Cora": "a795119a-cf6c-4ee0-bbeb-5ccec2f86fd3"
+        "Cora": "a795119a-cf6c-4ee0-bbeb-5ccec2f86fd3",
+        "Facebook": "4d7fdae5-1999-45e8-8b2e-267f29d9a258",
+        "PubMed": "391e2f22-a042-4d8c-bb37-38ab0b7188cb",
+        "p2p-Gnutella04": "cd5ab48a-35e1-4ec0-8cbe-8e7bb9e72136"
     }
 
     api = wandb.Api()
@@ -110,7 +113,8 @@ if __name__ == "__main__":
 
     # get maximum value for percentage recon
 
-    fig, ax = plt.subplots(1, num_plots, figsize=(3*num_plots, 3))
+    fig, ax = plt.subplots(2, int(num_plots/2), figsize=(2*num_plots, 3*2))
+    ax = ax.flatten()
     
     for i, (rank, values) in enumerate(sorted_dict.items()):
         epochs = values["data"]["epochs"]

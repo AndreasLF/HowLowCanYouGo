@@ -159,7 +159,7 @@ if __name__ == "__main__":
     # ranks = [64, 32, 16, 8, 12, 10, 9, 4, 6, 5, 7] # ! Just hardcoded the order
 
     # plot three colums for each rank
-    fig, ax = plt.subplots(1, 3, figsize=(10, 2))
+    fig, ax = plt.subplots(1, 3, figsize=(10, 3))
     ax = ax.flatten()   # Flatten to easily iterate
 
     for i, rank in enumerate(ranks):
