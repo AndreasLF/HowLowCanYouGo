@@ -1,10 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Oct  1 13:47:48 2020
-
-@author: nnak
-"""
-
 # Import all the packages
 # import pdb
 import os
@@ -261,8 +254,7 @@ def check_reconctruction(edges,Z,W,beta,N1,N2):
     # Define the combined radius search function
 
     # Perform parallel radius searches for counts and indices
-    n_jobs = -1
-    # n_jobs = 16
+    n_jobs = 16 # ! specify number of multiprocessing jobs
     results = Parallel(n_jobs=n_jobs, backend='loky')(
         delayed(radius_search)(tree, X[i], beta_np) for i in range(N1)
     )
@@ -327,7 +319,6 @@ def create_model(dataset, latent_dim, link_function = "SOFTPLUS", device='cpu'):
     N2=int(sparse_j.max()+1)
 
     model = LSM(link_function,sparse_i,sparse_j,N1,N2,latent_dim=latent_dim,CVflag=True,graph_type='directed',missing_data=False).to(device)    
-    # model = LSM(link_function,sparse_i,sparse_j,N1,N2,latent_dim=latent_dim,non_sparse_i=non_sparse_i,non_sparse_j=non_sparse_j,sparse_i_rem=sparse_i_rem,sparse_j_rem=sparse_j_rem,CVflag=True,graph_type='undirected',missing_data=False).to(device)    
     return model, N1, N2, edges
 
 
@@ -347,11 +338,12 @@ def train(model,
           dataset_name = None,
           model_path = "notset",
           wandb_logging = True,
-          search_state = {}
+          search_state = {},
+          STATE_PATH = None
           ):
     
     stop_flag = True
-    # stop_flag = False # ! keep this uncommented
+    stop_flag = False # ! keep this uncommented
     checkpoint_freq = 100
     # checkpoint_freq = 5
 
@@ -478,12 +470,12 @@ def train(model,
 
     if phase_epochs[1] == 0 and stop_flag: #pdb.set_trace() # ! if stop_flag is True, you can manually load a pretrained model for phase 3
         # ? e.g. state = torch.load(STATE_PATH); model = state['model']; optimizer_hinge = state['optimizer']
-        STATE_PATH = "ckpt_com-amazon/d67f3c41-7ee7-44ea-b4f8-960ec9e9d4be/epoch40_state.pt"
+        STATE_PATH = "ckpt_roadNet-PA/9b864985-1630-49cb-b011-af1d60657cce/epoch10_state.pt"
         print(f"Loading from {STATE_PATH}")
         state = torch.load(STATE_PATH); model = state['model']; optimizer_hinge = state['optimizer']
-    
-    # ! save model after HBDM pre-training
-    torch.save(model, f"HBDM_pretrained_model_{exp_id}.pt")
+    else:
+        # ! save model after HBDM pre-training
+        torch.save(model, f"HBDM_pretrained_model_{exp_id}.pt")
 
     percentage,num_elements,active=check_reconctruction(edges,model.latent_z,model.latent_w,model.bias,N1,N2)
     print(f'Miss-classified percentage of total elements: {100*percentage}%, i.e. {num_elements} elements',)
@@ -497,12 +489,12 @@ def train(model,
     
     # ! LR scheduler for hinge loss
     optimizer_hinge = optimizer_hinge or optim.Adam(model.parameters(), lr=learning_rate_hinge)
-    lr_patience = 10
+    lr_patience = 15
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer_hinge, mode='min', factor=0.5, patience=lr_patience, verbose=True)
     # lr_scheduler = None # comment out to use lr scheduling
 
     pbar = tqdm(range(search_state.get('cur_epoch', 0), phase_epochs[3] + 1))
-    for epoch in pbar:
+    for epoch in pbar: # ! PHASE 3
         metrics = {"epoch": phase_epochs[2] + epoch + 1}
 
         if epoch % checkpoint_freq == 0 and epoch != 0 and search_state is not None:

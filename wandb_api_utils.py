@@ -1,4 +1,3 @@
-# Script taken from https://github.com/AndreasLF/GraphEmbeddings/blob/main/graph_embeddings/utils/wandb_api_utils.py
 import wandb
 
 class WANDbAPIUtils:

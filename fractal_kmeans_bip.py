@@ -1,15 +1,3 @@
-
-
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Nov 19 10:08:53 2020
-
-@author: nnak
-"""
-
-
-
-
 import timeit
 import torch
 import numpy as np

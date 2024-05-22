@@ -97,8 +97,6 @@ def find_optimal_rank(min_rank: int,
                                     # learning_rate_hinge=1.,
                                     learning_rate_hinge=0.25,
                                     search_state=search_state)
-        # is_fully_reconstructed = True
-        # model = torch.load("")
         if is_fully_reconstructed:
             save_path = save_path.replace('.pt', '_FR.pt')
         torch.save(model, save_path)
@@ -116,9 +114,10 @@ def find_optimal_rank(min_rank: int,
 
             # 2. Perform SVD estimate from higher into lower rank approx.
             _,_,V = torch.svd_lowrank(svd_target, q=current_rank)
-            X,Y = torch.chunk(svd_target, 2, dim=0)
             # _bias = model.bias
             model, N1, N2, edges  = create_model(dataset=dataset, latent_dim=current_rank, device=device)
+            # X,Y = torch.chunk(svd_target, 2, dim=0)
+            X,Y = torch.split(svd_target, [N1, N2])
             model.latent_z = torch.nn.Parameter(X@V, requires_grad=True)
             model.latent_w = torch.nn.Parameter(Y@V, requires_grad=True)
             # model.bias = _bias
