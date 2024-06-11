@@ -14,6 +14,7 @@ CUDA = torch.cuda.is_available()
 from spectral_clustering import Spectral_clustering_init
 from sklearn import metrics
 from joblib import Parallel, delayed
+import pdb
 # from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
 import wandb
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -322,254 +323,317 @@ def create_model(dataset, latent_dim, link_function = "SOFTPLUS", device='cpu'):
     return model, N1, N2, edges
 
 
+def update_json(json_path, key, value):
+    import json
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+    data[key] = value
+    with open(json_path, 'w') as f:
+        json.dump(data, f, indent=4)
+    return data
 
 
-# ! main
+class Trainer:
+    def __init__(self, model, N1, N2, edges, 
+                 exp_id = None, 
+                 phase_epochs = {1: 1_000, 2: 5_000, 3: 10_000}, 
+                 kd_tree_freq = 5, 
+                 learning_rate = 0.1, 
+                 learning_rate_hinge = 0.1, 
+                 dataset_name = None, 
+                 model_path = "notset", 
+                 wandb_logging = True, 
+                 wandb_id = None,
+                 results_dir = "results"):
+        self.model = model
+        self.N1 = N1
+        self.N2 = N2
+        self.edges = edges
+        self.exp_id = exp_id
+        self.phase_epochs = phase_epochs
+        self.kd_tree_freq = kd_tree_freq
+        self.learning_rate = learning_rate
+        self.learning_rate_hinge = learning_rate_hinge
+        self.dataset_name = dataset_name
+        self.model_path = model_path
+        self.wandb_logging = wandb_logging
+        self.wandb_id = wandb_id
+        self.results_dir = results_dir
 
-def train(model,
-          N1,
-          N2,
-          edges,
-          exp_id = None,
-          phase_epochs = {1: 1_000, 2: 5_000, 3: 10_000},
-          kd_tree_freq = 5,
-          learning_rate = 0.1,
-          learning_rate_hinge = 0.1,
-          dataset_name = None,
-          model_path = "notset",
-          wandb_logging = True,
-          search_state = {},
-          STATE_PATH = None
-          ):
+        # ! training state
+        self.current_epoch = 0
+        self.current_phase = 1
+         
+    def save_checkpoint(self):
+        train_state = {"current_epoch": self.current_epoch, "current_phase": self.current_phase}
+
+        rank = self.model.latent_dim
+        save_state = {"model": self. model,
+                      "optimizer_state": self.optimizer.state_dict(),
+                      "optimizer_hinge_state": self.optimizer_hinge.state_dict() if self.optimizer_hinge is not None else None, 
+                      "learning_rate_scheduler_hinge": self.learning_rate_scheduler_hinge.state_dict() if self.learning_rate_scheduler_hinge is not None else None,
+                      "train_state": train_state,
+                      "wandb_id": self.wandb_id}
+        ckpt_path = f'{self.results_dir}/{self.exp_id}/checkpoints/state_rank{rank}_phase{self.current_phase}_epoch{self.current_epoch}.ckpt'
+        os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
+        torch.save(save_state, ckpt_path)
+        # update json in results dir
+        update_json(f'{self.results_dir}/{self.exp_id}/experiment_state.json', 'latest_checkpoint', ckpt_path)
+
+    @classmethod
+    def from_scratch(cls, model, N1, N2, edges, exp_id=None, phase_epochs={1: 1_000, 2: 5_000, 3: 10_000}, 
+                     kd_tree_freq=5, learning_rate=0.1, learning_rate_hinge=0.1, dataset_name=None, 
+                     model_path="notset", wandb_logging=True, results_dir="results"):
+        instance = cls(model=model, N1=N1, N2=N2, edges=edges, exp_id=exp_id, phase_epochs=phase_epochs, 
+                   kd_tree_freq=kd_tree_freq, learning_rate=learning_rate, learning_rate_hinge=learning_rate_hinge, 
+                   dataset_name=dataset_name, model_path=model_path, wandb_logging=wandb_logging, results_dir=results_dir)
+
+        instance.optimizer = optim.Adam(model.parameters(), learning_rate) 
+        instance.optimizer_hinge = optim.Adam(model.parameters(), learning_rate_hinge)
+        instance.learning_rate_scheduler_hinge = optim.lr_scheduler.ReduceLROnPlateau(instance.optimizer_hinge, mode='min', factor=0.5, patience=15, verbose=True)
+
+        return instance
+
+    @classmethod
+    def from_checkpoint(cls, checkpoint_path, exp_id=None, 
+                        phase_epochs={1: 1_000, 2: 5_000, 3: 10_000}, kd_tree_freq=5, learning_rate=0.1, 
+                        learning_rate_hinge=0.1, dataset_name=None, model_path="notset", wandb_logging=True, 
+                        results_dir="results"):
+
+        if os.path.exists(checkpoint_path):
+            checkpoint = torch.load(checkpoint_path)
+            model = checkpoint['model']
+
+            instance = cls(model=model, N1=model.input_size_1, N2=model.input_size_2, edges=model.edges,
+                           exp_id=exp_id,
+                           phase_epochs=phase_epochs,
+                           kd_tree_freq=kd_tree_freq,
+                           learning_rate=learning_rate, 
+                           learning_rate_hinge=learning_rate_hinge, 
+                           dataset_name=dataset_name, 
+                           model_path=model_path, 
+                           wandb_logging=wandb_logging, 
+                           wandb_id=checkpoint.get('wandb_id', None),
+                           results_dir=results_dir)
+            
+            
+            optimizer = optim.Adam(model.parameters())  # Initialize the optimizer
+            optimizer.load_state_dict(checkpoint['optimizer_state'])
+            instance.optimizer = optimizer
+
+            # ! load training state
+            train_state = checkpoint.get('train_state', None)
+            if train_state is not None:
+                instance.current_epoch = train_state.get('current_epoch', 0)
+                instance.current_phase = train_state.get('current_phase', 1)
+            
+            if checkpoint.get('optimizer_hinge_state', None) is not None:
+                instance.optimizer_hinge = optim.Adam(model.parameters(), lr=learning_rate_hinge if learning_rate_hinge is not None else checkpoint['learning_rate_hinge'])
+                instance.optimizer_hinge.load_state_dict(checkpoint['optimizer_hinge_state'])
+
+            if checkpoint.get('learning_rate_scheduler_hinge', None) is not None:
+                instance.learning_rate_scheduler_hinge = optim.lr_scheduler.ReduceLROnPlateau(instance.optimizer_hinge, mode='min', factor=0.5, patience=15, verbose=True)
+                instance.learning_rate_scheduler_hinge.load_state_dict(checkpoint['learning_rate_scheduler_hinge'])
+
+            print(f"Checkpoint loaded from {checkpoint_path}")
+            return instance
+        else:
+            raise FileNotFoundError(f"No checkpoint found at {checkpoint_path}")
+
+    # ! main
+    def train(self):        
+        checkpoint_freq = 100
+        # checkpoint_freq = 5
+
+        torch.autograd.set_detect_anomaly(True)
+
+
+        # ====================================== Initialize wandb ======================================
+        rank = self.model.latent_dim
+        if self.wandb_logging:
+            wandb_run_id = self.wandb_id
+            if wandb_run_id is None: 
+                run = wandb.init(project="GraphEmbeddings", 
+                                    config={'model_class': "LSM",
+                                            'data': self.dataset_name,
+                                            'rank': rank, 
+                                            'phase1_epochs': self.phase_epochs[1],
+                                            'phase2_epochs': self.phase_epochs[2],
+                                            'phase3_epochs': self.phase_epochs[3],
+                                            'kd_tree_freq': self.kd_tree_freq,
+                                            'exp_id': self.exp_id,
+                                            'learning_rate': self.learning_rate
+                                            })   
+
+                self.wandb_id = run.id
+            else:   
+                # Resume logging to another experiment
+                wandb.init(project="GraphEmbeddings",
+                resume="allow",  # Use "allow" to resume if possible, "must" to enforce resumption
+                id=wandb_run_id  # Use the run_id from the previous run
+                )     
+
+    # ################################################################################################################################################################
+    # ################################################################################################################################################################
+    # ################################################################################################################################################################
     
-    stop_flag = True
-    stop_flag = False # ! keep this uncommented
-    checkpoint_freq = 100
-    # checkpoint_freq = 5
+        self.model.scaling=0
+        # ! Phase 1
+        print(f'PHASE 1: Running HBDM for {self.phase_epochs[1]} iterations')
+        phase_str = "PHASE 1"
+        self.current_phase = 1
+        percentage, num_elements = torch.tensor(float('NaN')), torch.tensor(float('NaN'))
+        last_hbdm_loss, last_hinge_loss = torch.tensor(float('NaN')), torch.tensor(float('NaN'))
+        pbar = tqdm(range(self.current_epoch, self.phase_epochs[1] + self.phase_epochs[2]), initial=self.current_epoch, total=self.phase_epochs[1] + self.phase_epochs[2] + self.phase_epochs[3])
+        for epoch in pbar:
+            if self.current_phase == 3: break # if starting form a checkpoint in phase 3, break out of phase 1/2
+            self.current_epoch = epoch
+            metrics = {'epoch': epoch}
+            # Save checkpoint
+            if epoch % checkpoint_freq == 0 and epoch != 0: self.save_checkpoint() # ! Save checkpoint
 
-    torch.autograd.set_detect_anomaly(True)
-
-    rank = model.latent_dim
-    if wandb_logging:
-        wandb_run_id = search_state.get("wandb_id", None)
-        if wandb_run_id is None: 
-            run = wandb.init(project="GraphEmbeddings", 
-                                config={'model_class': "LSM",
-                                        'data': dataset_name,
-                                        'rank': rank, 
-                                        'phase1_epochs': phase_epochs[1],
-                                        'phase2_epochs': phase_epochs[2],
-                                        'phase3_epochs': phase_epochs[3],
-                                        'kd_tree_freq': kd_tree_freq,
-                                        'exp_id': exp_id,
-                                        'learning_rate': learning_rate
-                                        })   
-
-            search_state["wandb_id"] = run.id
-        else:   
-            # Resume logging to another experiment
-            wandb.init(project="GraphEmbeddings",
-            resume="allow",  # Use "allow" to resume if possible, "must" to enforce resumption
-            id=wandb_run_id  # Use the run_id from the previous run
-            )     
-
-
-# ################################################################################################################################################################
-# ################################################################################################################################################################
-# ################################################################################################################################################################
-    
-    optimizer = optim.Adam(model.parameters(), learning_rate)  
-    optimizer_hinge = None
-
-    model.scaling=0
-    print(f'PHASE 1: Running HBDM for {phase_epochs[1]} iterations')
-    phase_str = "PHASE 1"
-    percentage, num_elements = torch.tensor(float('NaN')), torch.tensor(float('NaN'))
-    last_hbdm_loss, last_hinge_loss = torch.tensor(float('NaN')), torch.tensor(float('NaN'))
-    pbar = tqdm(range(search_state.get('cur_epoch', 0), phase_epochs[2]))
-    for epoch in pbar:
-        if search_state.get("phase", None) == 3: break # if starting form a checkpoint in phase 3
-
-        metrics = {'epoch': epoch}
-
-        if epoch % checkpoint_freq == 0 and epoch != 0 and search_state is not None:
-            os.makedirs(f"checkpoints/{dataset_name}_{exp_id}", exist_ok=True)
-            search_state['phase'] = int(phase_str[-1]) # hacky
-            search_state['cur_epoch'] = epoch
-            search_state['current_model'] = model.state_dict()
-            torch.save(search_state, f'checkpoints/{dataset_name}_{exp_id}/EE_model_{epoch}.ckpt') # EED search state
-
-        if epoch < phase_epochs[1]: # ! PHASE 1
-            loss = -model.LSM_likelihood_bias(epoch=epoch) / N1
-            optimizer.zero_grad(set_to_none=True)  # clear the gradients.   
-            loss.backward()  # backpropagate
-            optimizer.step()  # update the weights
-            last_hbdm_loss = loss.detach().cpu().item()
-            metrics["hbdm_loss"] = last_hbdm_loss
-        else: # ! PHASE 2
-            # TODO? reconstruction check based on size of edge list before going to phase 2
-            # i.e. num_elements <= |edge_list|*log(|edge_list|)
-            if epoch == phase_epochs[1]:
-                print(f'PHASE 2: Running HBDM and Hinge loss, for every HBDM iteration running {kd_tree_freq} iterations for the hinge loss')
-                phase_str = "PHASE 2"
-
-            if epoch % 2 == 0:
-                loss = -model.LSM_likelihood_bias(epoch=epoch) / N1
-                optimizer.zero_grad(set_to_none=True)  # clear the gradients.   
+            # ! PHASE 1
+            if epoch < self.phase_epochs[1]: 
+                loss = -self.model.LSM_likelihood_bias(epoch=epoch) / self.N1
+                self.optimizer.zero_grad(set_to_none=True)  # clear the gradients.   
                 loss.backward()  # backpropagate
-                optimizer.step()  # update the weights
+                self.optimizer.step()  # update the weights
                 last_hbdm_loss = loss.detach().cpu().item()
                 metrics["hbdm_loss"] = last_hbdm_loss
-            else:
-                percentage, num_elements, active = check_reconctruction(edges, model.latent_z, model.latent_w, model.bias, N1, N2)
-                i_link, j_link = active.indices()[:, active.values() == 1]
-                i_non_link, j_non_link = active.indices()[:, active.values() == -1]
-                mask = i_non_link != j_non_link
-                i_non_link = i_non_link[mask]
-                j_non_link = j_non_link[mask]
+            # ! PHASE 2
+            else: 
+                # TODO? reconstruction check based on size of edge list before going to phase 2
+                # i.e. num_elements <= |edge_list|*log(|edge_list|)
+                if epoch == self.phase_epochs[1]:
+                    print(f'PHASE 2: Running HBDM and Hinge loss, for every HBDM iteration running {self.kd_tree_freq} iterations for the hinge loss')
+                    phase_str = "PHASE 2"
+                    self.current_phase = 2
 
-                if num_elements == 0: # ! PERFECT RECONSTRUCTION
-                    print('Total reconstruction achieved')
-                    save_path = model_path.replace('.pt', '_FR.pt')
-                    if wandb_logging:
-                        wandb.config.update({'full_reconstruction': True, "model_path":save_path})
-                        wandb.finish()
-                        search_state.pop("wandb_id")
-                    if 'cur_epoch' in search_state.keys(): search_state.pop('cur_epoch')
-                    if 'phase' in search_state.keys(): search_state.pop('phase')
-                    return True
-
-                for j in range(5):
-                    loss = -model.final_analytical(i_link, j_link, i_non_link, j_non_link, hinge=True) / N1
-                    optimizer.zero_grad(set_to_none=True)  # clear the gradients.
+                if epoch % 2 == 0:
+                    loss = -self.model.LSM_likelihood_bias(epoch=epoch) / self.N1
+                    self.optimizer.zero_grad(set_to_none=True)  # clear the gradients.   
                     loss.backward()  # backpropagate
-                    optimizer.step()  # update the weights
-                last_hinge_loss = loss.detach().cpu().item()
-                metrics["hinge_loss"] = last_hinge_loss
+                    self.optimizer.step()  # update the weights
+                    last_hbdm_loss = loss.detach().cpu().item()
+                    metrics["hbdm_loss"] = last_hbdm_loss
+                else:
+                    percentage, num_elements, active = check_reconctruction(self.edges, self.model.latent_z, self.model.latent_w, self.model.bias, self.N1, self.N2)
+                    i_link, j_link = active.indices()[:, active.values() == 1]
+                    i_non_link, j_non_link = active.indices()[:, active.values() == -1]
+                    mask = i_non_link != j_non_link
+                    i_non_link = i_non_link[mask]
+                    j_non_link = j_non_link[mask]
+
+                    if num_elements == 0: # ! PERFECT RECONSTRUCTION
+                        print('Total reconstruction achieved')
+                        self.save_checkpoint() # ! Save checkpoint
+                        save_path = self.model_path.replace('.pt', '_FR.pt')
+                        if self.wandb_logging:
+                            wandb.config.update({'full_reconstruction': True, "model_path":save_path})
+                            wandb.finish()
+                        return True
+
+                    for j in range(5):
+                        loss = -self.model.final_analytical(i_link, j_link, i_non_link, j_non_link, hinge=True) / self.N1
+                        self.optimizer.zero_grad(set_to_none=True)  # clear the gradients.
+                        loss.backward()  # backpropagate
+                        self.optimizer.step()  # update the weights
+                    last_hinge_loss = loss.detach().cpu().item()
+
+                    metrics["hinge_loss"] = last_hinge_loss
+                    metrics["misclassified_dyads_perc"] = percentage.detach().cpu().item()*100
+                    metrics["misclassified_dyads"] = num_elements
+
+            pbar.set_description(f"[{phase_str}] [last HBDM loss={last_hbdm_loss:.4f}] [last Hinge loss={last_hinge_loss:.4f}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
+            if self.wandb_logging: wandb.log(metrics)
+
+        # save checkpoint
+        self.save_checkpoint() # ! Save checkpoint
+                    
+        print(f'PHASE 3: Running Hinge loss only (building kdtree every {self.kd_tree_freq} iterations)')
+        phase_str = "PHASE 3"
+        self.current_phase = 3
+
+        # ! set to CPU for hinge loss
+        torch.set_default_tensor_type('torch.FloatTensor') 
+        device = torch.device('cpu')
+        self.edges = self.edges.to(device)
+        self.model = self.model.to(device)
+
+        percentage,num_elements,active=check_reconctruction(self.edges,self.model.latent_z,self.model.latent_w,self.model.bias,self.N1,self.N2)
+        print(f'Miss-classified percentage of total elements: {100*percentage}%, i.e. {num_elements} elements',)
+
+        i_link,j_link=active.indices()[:,active.values()==1]
+
+        i_non_link,j_non_link=active.indices()[:,active.values()==-1]
+        mask=i_non_link!=j_non_link
+        i_non_link=i_non_link[mask]
+        j_non_link=j_non_link[mask]
+        
+        # ! LR scheduler for hinge loss
+        optimizer_hinge = self.optimizer_hinge
+        lr_patience = 15
+        lr_scheduler = self.learning_rate_scheduler_hinge
+        # lr_scheduler = None # comment out to use lr scheduling
+
+        pbar = tqdm(range(self.current_epoch, self.phase_epochs[3] + self.phase_epochs[2] + self.phase_epochs[1]), initial=self.current_epoch, total=self.phase_epochs[3] + self.phase_epochs[2] + self.phase_epochs[1])
+        # ! PHASE 3
+        for epoch in pbar: 
+            self.current_epoch = epoch
+            metrics = {"epoch": epoch}
+
+            if epoch % checkpoint_freq == 0 and epoch != 0: self.save_checkpoint() # ! Save checkpoint
+
+            loss= - self.model.final_analytical(i_link, j_link, i_non_link, j_non_link)/self.N1
+            last_hinge_loss = loss.detach().cpu().item()
+        
+            optimizer_hinge.zero_grad(set_to_none=True) # clear the gradients.   
+            loss.backward() # backpropagate
+            metrics["hinge_loss"] = last_hinge_loss
+            optimizer_hinge.step() # update the weights
+            if lr_scheduler is not None and epoch > lr_patience:
+                lr_scheduler.step(loss.item())
+            
+            # scheduler.step()
+            if epoch%self.kd_tree_freq==0: # ! evalute every 5 or 25? etc.
+                percentage,num_elements,active=check_reconctruction(self.edges, self.model.latent_z,self.model.latent_w,self.model.bias,self.N1,self.N2)
+
+                # ! log reconstruction metrics after every update
                 metrics["misclassified_dyads_perc"] = percentage.detach().cpu().item()*100
                 metrics["misclassified_dyads"] = num_elements
+                if self.wandb_logging: wandb.log(metrics)
 
-            # if epoch % 100 == 0:
+                i_link,j_link=active.indices()[:,active.values()==1]
 
-            #     if epoch > 400:
-            #         percentage, num_elements, active = check_reconctruction(edges, model.latent_z, model.latent_w, model.bias, N1, N2)
-            #         print(f'Miss-classified percentage of total elements: {100 * percentage}%, i.e. {num_elements} elements',)
-            #         print(f'compared to nlogn, i.e. {num_elements / (N1 * np.log(N1))} elements',)
+                i_non_link,j_non_link=active.indices()[:,active.values()==-1]
+                mask=i_non_link!=j_non_link
+                i_non_link=i_non_link[mask]
+                j_non_link=j_non_link[mask]
 
-        pbar.set_description(f"[{phase_str}] [last HBDM loss={last_hbdm_loss:.4f}] [last Hinge loss={last_hinge_loss:.4f}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
-        if wandb_logging: wandb.log(metrics)
-                
-    print(f'PHASE 3: Running Hinge loss only (building kdtree every {kd_tree_freq} iterations)')
-    phase_str = "PHASE 3"
+                if num_elements==0: # ! PERFECT RECONSTRUCTION
+                    print('Total reconstruction achieved!')
+                    self.save_checkpoint() # ! Save checkpoint
+                    save_path = self.model_path.replace('.pt', '_FR.pt')
+                    if self.wandb_logging:
+                        wandb.config.update({'full_reconstruction': True, "model_path":save_path})
+                        wandb.finish()
 
-    # ! set to CPU for hinge loss
-    torch.set_default_tensor_type('torch.FloatTensor') 
-    device = torch.device('cpu')
-    edges = edges.to(device)
-    model = model.to(device)
+                    return True
 
-    if phase_epochs[1] == 0 and stop_flag: #pdb.set_trace() # ! if stop_flag is True, you can manually load a pretrained model for phase 3
-        # ? e.g. state = torch.load(STATE_PATH); model = state['model']; optimizer_hinge = state['optimizer']
-        STATE_PATH = "ckpt_roadNet-PA/9b864985-1630-49cb-b011-af1d60657cce/epoch10_state.pt"
-        print(f"Loading from {STATE_PATH}")
-        state = torch.load(STATE_PATH); model = state['model']; optimizer_hinge = state['optimizer']
-    else:
-        # ! save model after HBDM pre-training
-        torch.save(model, f"HBDM_pretrained_model_{exp_id}.pt")
+            pbar.set_description(f"[{phase_str}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
 
-    percentage,num_elements,active=check_reconctruction(edges,model.latent_z,model.latent_w,model.bias,N1,N2)
-    print(f'Miss-classified percentage of total elements: {100*percentage}%, i.e. {num_elements} elements',)
-
-    i_link,j_link=active.indices()[:,active.values()==1]
-
-    i_non_link,j_non_link=active.indices()[:,active.values()==-1]
-    mask=i_non_link!=j_non_link
-    i_non_link=i_non_link[mask]
-    j_non_link=j_non_link[mask]
-    
-    # ! LR scheduler for hinge loss
-    optimizer_hinge = optimizer_hinge or optim.Adam(model.parameters(), lr=learning_rate_hinge)
-    lr_patience = 15
-    lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer_hinge, mode='min', factor=0.5, patience=lr_patience, verbose=True)
-    # lr_scheduler = None # comment out to use lr scheduling
-
-    pbar = tqdm(range(search_state.get('cur_epoch', 0), phase_epochs[3] + 1))
-    for epoch in pbar: # ! PHASE 3
-        metrics = {"epoch": phase_epochs[2] + epoch + 1}
-
-        if epoch % checkpoint_freq == 0 and epoch != 0 and search_state is not None:
-            os.makedirs(f"checkpoints/{dataset_name}_{exp_id}", exist_ok=True)
-            search_state['phase'] = 3
-            search_state['cur_epoch'] = epoch
-            search_state['current_model'] = model.state_dict()
-            torch.save(search_state, f'checkpoints/{dataset_name}_{exp_id}/EE_model_{epoch}.ckpt') # EED search state
-                        
-        loss= - model.final_analytical(i_link, j_link, i_non_link, j_non_link)/N1
-        last_hinge_loss = loss.detach().cpu().item()
-    
-        optimizer_hinge.zero_grad(set_to_none=True) # clear the gradients.   
-        loss.backward() # backpropagate
-        metrics["hinge_loss"] = last_hinge_loss
-        optimizer_hinge.step() # update the weights
-        if lr_scheduler is not None and epoch > lr_patience:
-            lr_scheduler.step(loss.item())
-        
-        # scheduler.step()
-        if epoch%kd_tree_freq==0: # ! evalute every 5 or 25? etc.
-            percentage,num_elements,active=check_reconctruction(edges, model.latent_z,model.latent_w,model.bias,N1,N2)
-
-            # ! log reconstruction metrics after every update
-            metrics["misclassified_dyads_perc"] = percentage.detach().cpu().item()*100
-            metrics["misclassified_dyads"] = num_elements
-            if wandb_logging: wandb.log(metrics)
-
-            i_link,j_link=active.indices()[:,active.values()==1]
-
-            i_non_link,j_non_link=active.indices()[:,active.values()==-1]
-            mask=i_non_link!=j_non_link
-            i_non_link=i_non_link[mask]
-            j_non_link=j_non_link[mask]
-
-            if num_elements==0: # ! PERFECT RECONSTRUCTION
-                print('Total reconstruction achieved!')
-                save_path = model_path.replace('.pt', '_FR.pt')
-                if wandb_logging:
-                    wandb.config.update({'full_reconstruction': True, "model_path":save_path})
-                    wandb.finish()
-                    search_state.pop('wandb_id')
-                if 'cur_epoch' in search_state.keys(): search_state.pop('cur_epoch')
-                if 'phase' in search_state.keys(): search_state.pop('phase')
-
-                return True
-            
-            # if epoch % 25 == 0:
-            os.makedirs(f"ckpt_{dataset_name}/{exp_id}", exist_ok=True)
-            save_state = {"model": model, "optimizer": optimizer_hinge}
-            torch.save(save_state, f"ckpt_{dataset_name}/{exp_id}/epoch{epoch}_state.pt")
-            del save_state
-        
-        # if phase_epochs[1] == 0 and stop_flag: pdb.set_trace() # ! if stop_flag is True, you can manually save a model that has trained for a bit in phase 3
-
-        # pbar.set_description(f"[{phase_str}] [LR = {lr_scheduler.last_lr()}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
-        pbar.set_description(f"[{phase_str}] [last hinge loss={last_hinge_loss}] [misclassified dyads = {percentage.detach().cpu().item()*100 : .4f}% - i.e. {num_elements}]")
-        
-    
-
-    if wandb_logging:
-        wandb.config.update({"model_path": model_path})
-        wandb.finish()
-        search_state.pop('wandb_id')
-        if 'cur_epoch' in search_state.keys(): search_state.pop('cur_epoch')
-        if 'phase' in search_state.keys(): search_state.pop('phase')
-    return False
+        if self.wandb_logging:
+            wandb.config.update({"model_path": self.model_path})
+            wandb.finish()
+        return False
             
 
 # !!!!! FOR EED SEARCH, RUN find_optimal_rank.py
 if __name__ == '__main__':
     latent_dim = 50
-    dataset_relpath = "datasets"
-    dataset = 'Cora'
-    model, N1, N2, edges = create_model(f"{dataset_relpath}/{dataset}", latent_dim)
-    is_reconstructed = train(model, N1, N2, edges)
+    # dataset_relpath = "datasets"
+    # dataset = 'Cora'
+    # model, N1, N2, edges = create_model(f"{dataset_relpath}/{dataset}", latent_dim)
+    # is_reconstructed = train(model, N1, N2, edges)
     # torch.save(model, "")
     # pdb.set_trace()            
