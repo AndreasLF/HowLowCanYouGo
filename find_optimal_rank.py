@@ -37,7 +37,7 @@ def find_optimal_rank(min_rank: int,
     dataset_name = dataset.split("/")[-1]
 
     # if exp_id is set, we continue an experiment
-    if exp_id:
+    if exp_id and os.path.exists(f"{results_folder}/{exp_id}"):
         print(f"Continuing experiment with id: {exp_id}")
 
         experiment_folder = f"{results_folder}/{exp_id}"
@@ -60,7 +60,7 @@ def find_optimal_rank(min_rank: int,
         if num_trainings > 0 and latest_checkpoint is not None:
             phase_epochs[1] = 0
     else:
-        exp_id = str(uuid.uuid4())
+        exp_id = exp_id or str(uuid.uuid4())
         # create folder for experiment
         experiment_folder = f"{results_folder}/{exp_id}"
         exp_json_path = f"{experiment_folder}/experiment_state.json"
