@@ -1,5 +1,6 @@
 import pdb
 import torch
+from graph_embeddings.models.HyperbolicModel import HyperbolicModel
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.models.PCAModel import PCAModel
 from graph_embeddings.models.LatentEigenModel import LatentEigenModel
@@ -76,6 +77,7 @@ def run_experiment(config: Config,
             # Determine the model and loss function based on config
             model_class = {'PCA': PCAModel, 
                            'L2': L2Model, 
+                           'Hyperbolic': HyperbolicModel, 
                            'LatentEigen': LatentEigenModel}[model_type]
             loss_fn = {"logistic": CaseControlLogisticLoss if batching_type == 'casecontrol' else LogisticLoss,
                         "hinge": CaseControlHingeLoss if batching_type=="casecontrol" else HingeLoss, 

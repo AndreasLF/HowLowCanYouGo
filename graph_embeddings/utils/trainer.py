@@ -2,16 +2,19 @@ import pdb
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import geoopt.optim as geoptim
 from torch.optim.lr_scheduler import StepLR
 from tqdm import tqdm
 import os
 
-from torch_geometric.utils import to_dense_adj
+# from torch_geometric.utils import to_dense_adj
 
+from graph_embeddings.models.HyperbolicModel import HyperbolicModel
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.models.PCAModel import PCAModel
 from graph_embeddings.models.LatentEigenModel import LatentEigenModel
-from graph_embeddings.utils.load_data import load_adj
+# from graph_embeddings.models.rsgd import RiemannianSGD
+# from graph_embeddings.utils.load_data import load_adj
 from graph_embeddings.utils.logger import JSONLogger
 
 from graph_embeddings.utils.nearest_neighbours_reconstruction_check import get_edge_index_embeddings, compare_edge_indices
@@ -54,12 +57,10 @@ class Trainer:
 
     def calc_frob_error_norm(self, logits, A):
         """Compute the Frobenius error norm between the logits and the adjacency matrix."""
-
-
         logits[logits >= self.thresh] = 1.
         logits[logits < self.thresh] = 0.
 
-        # Diagonal elements (self-loops) are not considered # TODO - is this valid?
+        # Diagonal elements (self-loops) are not considered
         logits.fill_diagonal_(0)
         A.fill_diagonal_(0)
 
@@ -84,7 +85,7 @@ class Trainer:
 
     def train(self, 
               rank: int, 
-              model: L2Model|PCAModel|LatentEigenModel|None = None,
+              model: L2Model|PCAModel|LatentEigenModel|HyperbolicModel|None = None,
               lr: float = 0.01, 
               adjust_lr_patience: float = None, 
               eval_recon_freq: int = 100, # ! evaluate full reconstruction every {x}'th epoch
@@ -141,7 +142,11 @@ class Trainer:
             self.adj = self.dataloader.full_adj.to(self.device) # ! used for small graphs for FROB
    
         # ----------- Optimizer ----------- 
-        optimizer = optim.Adam(model.parameters(), lr=lr)
+        if model.__class__.__name__ == 'HyperbolicModel':
+            # optimizer = RiemannianSGD(model.parameters(), rgrad=model.rgrad, expm=model.expm, lr=lr) # ! changed for hyperbolic geometry!!
+            optimizer = geoptim.RiemannianAdam(model.parameters(), lr=lr)
+        else:
+            optimizer = optim.Adam(model.parameters(), lr=lr)
 
         # ----------- Scheduler -----------
         step_size = 1
@@ -194,7 +199,7 @@ class Trainer:
                         with torch.no_grad():  # Ensure no gradients are computed in this block
                             A_hat = model.reconstruct()
                             frob_error_norm = self.calc_frob_error_norm(A_hat, self.adj)
-
+                        # pdb.set_trace()
                         # Log metrics to all loggers'
                         metrics['frob_error_norm'] = frob_error_norm.item()
                        
@@ -202,11 +207,12 @@ class Trainer:
                         is_fully_reconstructed = frob_error_norm <= self.threshold
 
                         recons_report_str += f" frob-err={frob_error_norm or .0:.4f}" # for progress bar
-                            
+                    
+                    frac_correct = None
                     if self.reconstruction_check in {"neigh", "both"}:
                         assert loss_fn_name != 'PoissonLoss', "Nearest neighbors reconstruction check not implemented for PoissonLoss"
                         # Compute Frobenius error for diagnostics
-                        if model.beta >= 0: # ! ensure beta is nonnegative, as we use it for radius when computing nearest neighbors
+                        if model.__class__.__name__ != "HyperbolicModel" and model.beta >= 0: # ! ensure beta is nonnegative, as we use it for radius when computing nearest neighbors
                             with torch.no_grad():
                                 edge_index_from_neighbors = get_edge_index_embeddings(model.X, model.Y, model.beta)
                                 is_fully_reconstructed, frac_correct = equals_set(edge_index_from_neighbors, 

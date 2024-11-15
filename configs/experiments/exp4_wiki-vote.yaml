@@ -1,11 +1,11 @@
 dataset_path: './data/adj_matrices/Wiki-Vote.pt'
 dataset_ref: 'SNAPDataset/Wiki-Vote'
-model_types: ['L2', 'PCA']
-loss_types: ['hinge', 'logistic']
+model_types: ['Hyperbolic', 'L2']
+loss_types: ['hinge']
 num_epochs: 30_000
 model_init: 'random'
-lr: 0.3
-early_stop_patience: 500
+lr: 0.2
+early_stop_patience: 400
 rank_range:
   min: 1
-  max: 50
+  max: 96

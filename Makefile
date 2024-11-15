@@ -39,16 +39,16 @@ run_experiments:
 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/run_experiments.py $(ARGS)
 
 DEVICE = cuda
-RANK = 32
-LR = 1.0
+RANK = 64
+LR = 0.25
 EPOCHS = 10_000
-DATASET = Planetoid/Cora
+# DATASET = Planetoid/Cora
+DATASET = SNAPDataset/Wiki-Vote
 # BATCHING_TYPE = casecontrol
 # BATCH_SIZE_PERCENTAGE = 0.1 # batch = full adj
 BATCHING_TYPE = random
 BATCH_SIZE_PERCENTAGE = 1.0 # batch = full adj
-RECONS_CHECK = both
-
+RECONS_CHECK = frob
 TRAIN_RANDOM = 	$(PYTHON_INTERPRETER) $(PROJECT_NAME)/train.py \
 		--rank $(RANK) \
 		--lr $(LR) --num-epochs $(EPOCHS) \
@@ -71,7 +71,15 @@ train-leig:
 	$(TRAIN_RANDOM) \
 		--model-type LatentEigen --loss-type logistic \
 		--save-ckpt results/lpca.pt
+train-lhyp:
+	$(TRAIN_RANDOM) \
+		--model-type Hyperbolic --loss-type logistic \
+		--save-ckpt results/lhyp.pt
 
+train-hhyp:
+	$(TRAIN_RANDOM) \
+		--model-type Hyperbolic --loss-type hinge \
+		--save-ckpt results/hhyp.pt
 train-hl2:
 	$(TRAIN_RANDOM) \
 		--model-type L2 --loss-type hinge \
@@ -93,6 +101,10 @@ train-ppca:
 	$(TRAIN_RANDOM) \
 		--model-type PCA --loss-type poisson \
 		--save-ckpt results/ppca.pt
+train-phyp:
+	$(TRAIN_RANDOM) \
+		--model-type Hyperbolic --loss-type poisson \
+		--save-ckpt results/phyp.pt
 
 
 PLOT_BETA = True
