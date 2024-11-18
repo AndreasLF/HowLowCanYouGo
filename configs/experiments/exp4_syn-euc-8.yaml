@@ -1,10 +1,10 @@
-dataset_path: './data/adj_matrices/ca-HepPh.pt'
-dataset_ref: 'SNAPDataset/ca-HepPh'
+dataset_path: './data/adj_matrices/syn-euc-8.pt'
+dataset_ref: './data/raw/syn-euc-8/processed/data.pt'
 model_types: ['Hyperbolic', 'L2']
 loss_types: ['hinge']
 num_epochs: 30_000
 model_init: 'random'
-lr: 0.3
+lr: 0.1
 early_stop_patience: 400
 rank_range:
   min: 1

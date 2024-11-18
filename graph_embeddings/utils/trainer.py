@@ -145,6 +145,7 @@ class Trainer:
         if model.__class__.__name__ == 'HyperbolicModel':
             # optimizer = RiemannianSGD(model.parameters(), rgrad=model.rgrad, expm=model.expm, lr=lr) # ! changed for hyperbolic geometry!!
             optimizer = geoptim.RiemannianAdam(model.parameters(), lr=lr)
+            # optimizer = geoptim.RiemannianSGD(model.parameters(), lr=lr)
         else:
             optimizer = optim.Adam(model.parameters(), lr=lr)
 

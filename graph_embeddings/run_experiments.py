@@ -1,5 +1,6 @@
 import pdb
 import torch
+from torch_geometric.data import Batch
 from graph_embeddings.models.HyperbolicModel import HyperbolicModel
 from graph_embeddings.models.L2Model import L2Model
 from graph_embeddings.models.PCAModel import PCAModel
@@ -43,6 +44,10 @@ def run_experiment(config: Config,
         src_split = dat.split("/")
         dataset = get_data_from_torch_geometric(src_split[0], src_split[1], raw_path)
         data = dataset[0]
+    elif "syn" in dat.lower():
+        dataset = [torch.load(dat)]
+        dataset[0].name = experiment_name
+        dataset = Batch.from_data_list(dataset)
     # Get first graph in dataset
     data = dataset[0]
 

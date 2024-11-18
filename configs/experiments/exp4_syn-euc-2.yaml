@@ -1,0 +1,11 @@
+dataset_path: './data/adj_matrices/syn-euc-2.pt'
+dataset_ref: './data/raw/syn-euc-2/processed/data.pt'
+model_types: ['L2', 'Hyperbolic']
+loss_types: ['hinge']
+num_epochs: 30_000
+model_init: 'random'
+lr: 0.2
+early_stop_patience: 400
+rank_range:
+  min: 1
+  max: 32

@@ -1,4 +1,5 @@
 # import pytorch geometric
+import pdb
 import torch
 import torch_geometric.datasets
 from torch_geometric.datasets import SNAPDataset
@@ -62,7 +63,13 @@ extra_datasets = {
     'as-skitter': ['as-skitter.txt.gz'], # Nodes: 1,696,415
     'as-caida': ['as-caida20071105.txt.gz'], # Nodes: 8,020-26,475
     'loc-gowalla': ['loc-gowalla_edges.txt.gz'], # Nodes: 196,591
-    'loc-brightkite': ['loc-brightkite_edges.txt.gz'] # Nodes: 58,228
+    'loc-brightkite': ['loc-brightkite_edges.txt.gz'], # Nodes: 58,228
+    'syn-euc-2': ['Euclidean_dimension_2.txt'],  # Nodes: 1,000
+    'syn-euc-3': ['Euclidean_dimension_3.txt'],  # Nodes: 1,000
+    'syn-euc-8': ['Euclidean_dimension_8.txt'],  # Nodes: 1,000
+    'syn-hyp-2': ['Hyperbolic_dimension_2.txt'], # Nodes: 1,000
+    'syn-hyp-3': ['Hyperbolic_dimension_3.txt'], # Nodes: 1,000
+    'syn-hyp-8': ['Hyperbolic_dimension_8.txt'], # Nodes: 1,000
     }
 
 # Monekypatch: Add the datasets to the available datasets in SNAPDataset
@@ -76,11 +83,14 @@ original_process = SNAPDataset.process
 def read_txt_dataset(files: List[str], name: str) -> List[Data]:
     import pandas as pd
 
-    edge_index = pd.read_csv(files[0], sep='\t', header=None, comment="#",
-                             dtype=np.int64)
+    synth_datasets = ['syn-euc-2', 'syn-euc-3', 'syn-euc-8', 'syn-hyp-2', 'syn-hyp-3', 'syn-hyp-8']
+    sep = None if name in synth_datasets else '\t'
+    
+    edge_index = pd.read_csv(files[0], sep=sep, header=None, comment="#", dtype=np.int64)
+    
     edge_index = torch.from_numpy(edge_index.values).t()
 
-    if name in ["com-amazon","com-dblp","com-orkut","com-youtube"]:
+    if name in (["com-amazon","com-dblp","com-orkut","com-youtube"] + synth_datasets):
         # make the graph undirected
         edge_index = torch.cat([edge_index, edge_index.flip(0)], dim=1)
 
@@ -257,4 +267,16 @@ if __name__ == "__main__":
             # save adjacency matrix
             new_file_path = f"{adj_matrix_path}/{dataset_name}.pt"
             save_adjacency_matrix(toy_dataset, new_file_path)
+        
+        elif src and "syn" in dataset_name.lower():
+            # pdb.set_trace()
+            filepath = f"{raw_path}/{dataset_name}/raw/{src}"
+            data = read_txt_dataset([filepath], name=dataset_name)[0]
+            adj = to_dense_adj(data.edge_index, max_num_nodes=data.num_nodes).squeeze()
+            # save adjacency matrix
+            new_file_path = f"{adj_matrix_path}/{dataset_name}.pt"
+            save_adjacency_matrix(adj, new_file_path)
+            processed_data_path = f"{raw_path}/{dataset_name}/processed"
+            os.makedirs(processed_data_path, exist_ok=True)
+            torch.save(data, f"{processed_data_path}/data.pt")
         
