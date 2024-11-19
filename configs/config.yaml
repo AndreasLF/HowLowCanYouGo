@@ -90,6 +90,8 @@ experiments:
     config_path: './configs/experiments/exp4_syn-euc-3.yaml'
   - name: syn-euc-8
     config_path: './configs/experiments/exp4_syn-euc-8.yaml'
+  - name: erdos-renyi
+    config_path: './configs/experiments/exp4_erdos-renyi.yaml'
 data:
   raw_path: ./data/raw
   adj_matrices_path: ./data/adj_matrices
@@ -113,6 +115,7 @@ data:
     syn-hyp-2: Hyperbolic_dimension_2.txt
     syn-hyp-3: Hyperbolic_dimension_3.txt
     syn-hyp-8: Hyperbolic_dimension_8.txt
+    erdos-renyi: erdos-renyi
 results:
   path: ./results
   logs_path: ./results/logs

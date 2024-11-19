@@ -44,7 +44,7 @@ def run_experiment(config: Config,
         src_split = dat.split("/")
         dataset = get_data_from_torch_geometric(src_split[0], src_split[1], raw_path)
         data = dataset[0]
-    elif "syn" in dat.lower():
+    elif "syn" in dat.lower() or "erdos-renyi":
         dataset = [torch.load(dat)]
         dataset[0].name = experiment_name
         dataset = Batch.from_data_list(dataset)

@@ -43,7 +43,8 @@ RANK = 64
 LR = 0.25
 EPOCHS = 10_000
 # DATASET = Planetoid/Cora
-DATASET = SNAPDataset/Wiki-Vote
+# DATASET = SNAPDataset/Wiki-Vote
+DATASET = erdos-renyi/erdos-renyi
 # BATCHING_TYPE = casecontrol
 # BATCH_SIZE_PERCENTAGE = 0.1 # batch = full adj
 BATCHING_TYPE = random

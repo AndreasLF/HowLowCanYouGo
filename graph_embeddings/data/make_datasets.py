@@ -70,6 +70,7 @@ extra_datasets = {
     'syn-hyp-2': ['Hyperbolic_dimension_2.txt'], # Nodes: 1,000
     'syn-hyp-3': ['Hyperbolic_dimension_3.txt'], # Nodes: 1,000
     'syn-hyp-8': ['Hyperbolic_dimension_8.txt'], # Nodes: 1,000
+    'erdos-renyi': ['erdos-renyi']
     }
 
 # Monekypatch: Add the datasets to the available datasets in SNAPDataset
@@ -280,3 +281,34 @@ if __name__ == "__main__":
             os.makedirs(processed_data_path, exist_ok=True)
             torch.save(data, f"{processed_data_path}/data.pt")
         
+        elif src and 'erdos-renyi' in dataset_name.lower():
+            import networkx
+            import torch
+            from torch_geometric.utils import from_networkx, to_dense_adj
+            import random
+            
+            # seed **everything** for ER generation
+            seed = 123
+            torch.manual_seed(seed)
+            np.random.seed(seed)
+            random.seed(seed)
+            torch.cuda.manual_seed(seed)
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+
+            cora = (2_708, 10_556)
+            citeseer = (3_327, 9_116)
+            facebook = (4_039, 88_253)
+
+            N,E = facebook
+            edge_prob = 2 * E / (N*(N-1))
+            er_graph = networkx.erdos_renyi_graph(N, p=edge_prob)
+
+            data = from_networkx(er_graph)
+            adj = to_dense_adj(data.edge_index, max_num_nodes=data.num_nodes).squeeze()
+            
+            new_file_path = f"{adj_matrix_path}/{dataset_name}.pt"
+            save_adjacency_matrix(adj, new_file_path)
+            processed_data_path = f"{raw_path}/{dataset_name}/processed"
+            os.makedirs(processed_data_path, exist_ok=True)
+            torch.save(data, f"{processed_data_path}/data.pt")
