@@ -17,7 +17,7 @@ def radius_search(tree, query_point, radius):
 
 
 # %%
-denoms = [1, 2]
+frac_to_keep = [1, 1/2, 1/4]
 
 # %% 
 # Load statedict 
@@ -30,19 +30,25 @@ beta_np = statedict["bias"]
 
 # %%
 
-for denom in denoms:
-    to_remove_n = int(latent_z.shape[0] / denom)
+for frac in frac_to_keep:
 
     # Pick to_remove_n random indices to remove
+    to_remove_n = int(latent_z.shape[0] - frac * latent_z.shape[0])
+
     indices_to_remove = np.random.choice(latent_z.shape[0], to_remove_n, replace=False)
+
+    print(indices_to_remove.shape)
 
     # Remove the indices
     latent_z_new = np.delete(latent_z, indices_to_remove, axis=0)
     latent_w_new = np.delete(latent_w, indices_to_remove, axis=0)
 
+
     X=np.concatenate((latent_z_new, latent_w_new))
 
-    N1 = # TODO get N1 as in the HBDM code 
+    dataset = "com-amazon"
+    sparse_i = torch.load(f'data/hbdm-data/{dataset}/sparse_i.pt', map_location=device)    
+    N1=int(sparse_i.max()+1)
 
     node_i=torch.arange(N1)
     # node_j=torch.arange(N2)
@@ -54,6 +60,7 @@ for denom in denoms:
 
 # %%
 
+    print("Starting radius search")
     t1 = time.time()
 
     # Perform parallel radius searches for counts and indices
