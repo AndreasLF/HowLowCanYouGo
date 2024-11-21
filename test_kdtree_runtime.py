@@ -17,7 +17,7 @@ def radius_search(tree, query_point, radius):
 
 
 # %%
-frac_to_keep = [1, 1/2, 1/4]
+frac_to_keep = [1, 1/2, 1/4, 1/8, 1/16]
 
 # %% 
 # Load statedict 
@@ -36,8 +36,6 @@ for frac in frac_to_keep:
     to_remove_n = int(latent_z.shape[0] - frac * latent_z.shape[0])
 
     indices_to_remove = np.random.choice(latent_z.shape[0], to_remove_n, replace=False)
-
-    print(indices_to_remove.shape)
 
     # Remove the indices
     latent_z_new = np.delete(latent_z, indices_to_remove, axis=0)
@@ -71,7 +69,7 @@ for frac in frac_to_keep:
 
     t2 = time.time()
 
-    print("Time taken for radius search: ", t2-t1, "Denominator", denom)
+    print("Time taken for radius search: ", t2-t1, "Fraction:", frac)
 
 
     # Separate the counts and indices from the results
