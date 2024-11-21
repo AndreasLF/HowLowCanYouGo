@@ -56,8 +56,8 @@ def adjacency_to_data(adj_matrix):
 
 # %%
 results_folder = "results/block_graphs"
-N = [1000]
-num_blocks = list(range(10,1000, 10))
+N = [100]
+num_blocks = list(range(5,100, 10))
 
 
 toy_data = create_1D_example(10, num_blocks=2)
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     parser.add_argument('--model-type', type=str, default='PCA', choices=['PCA','L2','LatentEigen','Hyperbolic'], help='Type of reconstruction model to use {LPCA, L2} (default: %(default)s)')
     parser.add_argument('--loss-type', type=str, default='logistic', choices=['logistic','hinge', 'poisson'], help='Type of loss to use {logistic, hinge, poisson} (default: %(default)s)')
     parser.add_argument('--num-epochs', type=int, default=1000, metavar='N', help='number of epochs to train (default: %(default)s)')
-    parser.add_argument('--rank', type=int, default=32, metavar='R', help='dimension of the embedding space (default: %(default)s)')
+    parser.add_argument('--rank', type=int, default=12, metavar='R', help='dimension of the embedding space (default: %(default)s)')
     parser.add_argument('--lr', type=float, default=1e-1, metavar='V', help='learning rate for training (default: %(default)s)')
     parser.add_argument('--device', type=str, default='cpu', choices=['cpu', 'cuda', 'mps'], help='torch device (default: %(default)s)')
     parser.add_argument('--load-ckpt', type=str, default='none', help='path to load model checkpoint (ckpt) from (default: %(default)s)')
@@ -111,27 +111,30 @@ if __name__ == '__main__':
                 dataloader = CaseControlDataLoader(data, batch_size=int(args.batchsize_percentage*data.num_nodes), dataset_name=dataset_name, negative_sampling_ratio=args.negatives_ratio)
                 assert args.loss_type == 'logistic', "Case Control batching only implemented for logistic loss!"
 
-            model_init = args.model_init
 
-            model = {"PCA": PCAModel, 
-                    "L2": L2Model, 
-                    "Hyperbolic": HyperbolicModel, 
-                    "LatentEigen": LatentEigenModel}[args.model_type]
-            loss_fn = {"logistic": CaseControlLogisticLoss if args.batching_type == 'casecontrol' else LogisticLoss,
-                    "hinge": HingeLoss, 
-                    "poisson": PoissonLoss}[args.loss_type]()
+            optimal_ranks = []
+            for i in range(10):
+                model_init = args.model_init
 
-            # Initialize the trainer
-            trainer = Trainer(dataloader=dataloader, model_class=model, loss_fn=loss_fn, model_init=model_init,
-                            threshold=1e-10, num_epochs=args.num_epochs, save_ckpt=args.save_ckpt,
-                            load_ckpt=args.load_ckpt, device=args.device, 
-                            loggers=[], reconstruction_check=args.recons_check)
-            
-            # Train one model model
-            model = trainer.init_model(args.rank)
+                model = {"PCA": PCAModel, 
+                        "L2": L2Model, 
+                        "Hyperbolic": HyperbolicModel, 
+                        "LatentEigen": LatentEigenModel}[args.model_type]
+                loss_fn = {"logistic": CaseControlLogisticLoss if args.batching_type == 'casecontrol' else LogisticLoss,
+                        "hinge": HingeLoss, 
+                        "poisson": PoissonLoss}[args.loss_type]()
 
-
-            optimal_rank = trainer.find_optimal_rank(min_rank=1, max_rank=args.rank, lr=args.lr, eval_recon_freq=10)
+                # Initialize the trainer
+                trainer = Trainer(dataloader=dataloader, model_class=model, loss_fn=loss_fn, model_init=model_init,
+                                threshold=1e-10, num_epochs=args.num_epochs, save_ckpt=args.save_ckpt,
+                                load_ckpt=args.load_ckpt, device=args.device, 
+                                loggers=[], reconstruction_check=args.recons_check)
+                
+                # Train one model model
+                model = trainer.init_model(args.rank)
+                
+                optimal_rank = trainer.find_optimal_rank(min_rank=1, max_rank=args.rank, lr=args.lr, eval_recon_freq=10)
+                optimal_ranks.append(optimal_rank)
 
 
 
@@ -164,7 +167,7 @@ if __name__ == '__main__':
 
 
             if b_str not in results["results"][args.model_type][n_str]:
-                results["results"][args.model_type][n_str][b_str] = optimal_rank
+                results["results"][args.model_type][n_str][b_str] = optimal_ranks
                 results["results"][args.model_type][n_str]["res_folder"] = exp_folder_name 
 
             # write back to json
