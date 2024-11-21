@@ -42,7 +42,7 @@ class HyperbolicModel(nn.Module):
         return A_hat
     
     
-    def poincare_distance(self,u, v, eps=1e-5, all_pairs=True):
+    def poincare_distance(self,u, v, eps=1e-5,all_pairs=True):
         """
         Compute the Poincaré distance between points u and v in the Poincaré ball model.
         
@@ -60,7 +60,7 @@ class HyperbolicModel(nn.Module):
         
         # Squared Euclidean distance between points
         if all_pairs:
-            euclidean_dist_sq = torch.cdist(u,v)#torch.sum((u - v) ** 2, dim=-1)
+            euclidean_dist_sq = torch.cdist(u,v)**2
         
             # Compute the Poincaré distance
             denom = (1 - norm_u**2).unsqueeze(1) * (1 - norm_v**2)
