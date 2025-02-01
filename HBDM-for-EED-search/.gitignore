@@ -1,0 +1,9 @@
+__pycache__
+wandb
+/data
+/results
+
+jobscripts/env_vars.sh
+*.out
+*.ckpt
+*.pt
