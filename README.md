@@ -1,5 +1,5 @@
 # How Low Can You Go?
-This repo is the official implementation of the [ICLR 2025](https://iclr.cc/virtual/2025/poster/29429) paper: **How Low Can You Go? Searching for the Intrinsic Dimensionality of Complex Networks Using Metric Node Embeddings** ([Link to Paper (Coming Soon)](#))  
+This repository contains code presented in the [ICLR 2025](https://iclr.cc/virtual/2025/poster/29429) paper: **How Low Can You Go? Searching for the Intrinsic Dimensionality of Complex Networks Using Metric Node Embeddings** ([Link to Paper (Coming Soon)](#))  
 
 ### Authors
 - Nikolaos Nakis <a href="https://github.com/Nicknakis"><img src="https://skillicons.dev/icons?i=github" width="16"></a>  <a href="https://www.linkedin.com/in/nikolaos-nakis-67a07a147/"><img src="https://skillicons.dev/icons?i=linkedin" width="16"></a>   
