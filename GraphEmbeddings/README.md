@@ -18,65 +18,125 @@ make requirements # make
 > Alternatively you can use [Conda](https://docs.conda.io/en/latest/) to create a virtual environment.
 
 
+## Logging and W&B Integration
+This project supports two types of logging:
+- JSON Logger – Stores logs locally in a structured JSON format.
+ - W&B (Weights & Biases) – A powerful tool for experiment tracking, visualization, and logging.
 
+[Weights & Biases (W&B)](https://docs.wandb.ai/quickstart/) is used to track experiments, store results, and some plots are made based on these experiment logs.
+
+> [!NOTE]
+> If W&B is not used, many plots and visualizations will not work, as they retrieve experiment data directly from W&B through the API.
 
 ## Get Data
-The data is downloaded from different sources and stored in the `data` folder.
-The data sources are defined in the `configs/config.yaml` file. Here there are either urls to the data or a specification of the [Pytorch Geometric dataset](https://pytorch-geometric.readthedocs.io/en/latest/cheatsheet/data_cheatsheet.html) to be used.
 
-To get the data you can either us
+The datasets are obtained from multiple sources and converted into adjacency matrices for processing. The sources are defined in the `configs/config.yaml` file. The data is automatically downloaded and preprocessed using the `make datasets` command, which calls the `make_datasets.py` script.
 
-### Get data with DVC
-If you have access to our data version control folder on Google Drive you can use the following command to get the data:
-```bash
-dvc pull
-```
-This will download the data from the Google Drive folder and place it in the `data` folder. The graph adjacency matrices are stored in the folder specified in the `configs/config.yaml` file.
+### 📥 Download and Preprocess Data
 
-### Get data without DVC
-If you do not have access to our data version control folder on Google Drive you have to download the data from the sources and preprocess it yourself. We have tried to make the process as seamless as possible. 
-Just run the following command:
+To download and preprocess all required datasets, simply run:
+
 ```bash
 make datasets
 ```
-This should download the data from the sources and preprocess it into adjacency matrices with edge weights of either 1 or 0.
+
+### 📊 Generate Dataset Statistics Table (Table 1)
+
+To generate **dataset statistics** such as the number of nodes, edges, degree distribution, clustering coefficient, and other structural properties, run:
+
+```bash
+make get_stats
+```
+
+This command will:
+- Compute key graph statistics for each dataset.
+- Store the results in a CSV file: ``<results_directory>/adj_matrix_stats.csv``
+ You can configure the exact path in ``configs/config.yaml`` under:
+```yaml
+results:
+  stats_path: "./results/stats"
+```
+- Format the output into a LaTeX table
 
 
-## Run experiments to find lowest rank representation for LPCA and L2
-To run an experiment you can use:
+## Run Experiments to Find Lowest Rank Representation
+
+Experiments can be run using the following command:
+
+```bash
+make run_experiments ARGS="--device <DEVICE> --experiment <EXPERIMENT_NAME> [OPTIONS]"
+```
+
+
+The following arguments are available. Some will overide the experiment config parameters.
+
+| Argument        | Description                                                                                          |
+|---------------|--------------------------------------------------------------------------------------------------|
+| `--device`     | Specify the computation device (`cpu` or `cuda`).                                                 |
+| `--all`        | Run all experiments in `configs/config.yaml`.                                                      |
+| `--experiment` | Run a specific experiment by name.                                                                |
+| `--loglevel`   | Logging level: `0` (nothing), `1` (JSON logs), `2` (JSON + WANDB), `3` (WANDB only).               |
+| `--recons-check` | Method for checking full reconstruction: `frob` (Frobenius error) or `neigh` (nearest neighbors in embedding space). |
+| `--loss`       | Override the loss function (options: `logistic`, `hinge`, `poisson`).                              |
+| `--model`      | Override the model type (options: `PCA`, `L2`, `Hyperbolic`, `LatentEigen`).                       |
+
+
+
+
+### Example: Running a Specific Experiment 
+
+To run an experiment, specify its name as defined in ``configs/config.yaml``. 
+
 ```bash
 make run_experiments ARGS="--device cpu --experiment Cora1"
 ```
-The following arguments can be used:
-<!-- Create table with args -->
-| Argument | Description | Default |
-| --- | --- | --- |
-| `--device` | Device to run the experiments on. | `cpu` |
-| `--all` | Run all experiments. | `False` |
-| `--experiment` | Run a specific experiment. This should be defined in the main config. | `None` |
-| `--dev` | Run in development mode, i.e. without WANDB logging. | `False` |
 
-This will run the experiments defined in the `configs/config.yaml` file.
+This will run an experiment according to the specific experiment config in ``configs/experiments``
 
-### Experiment definition (main config)
-The experiments are defined in the `configs/config.yaml` file. Here you can define the experiments with names and an experiment configuration. An example can be seen below:
-```yaml
-experiments:
-  - name: Cora1 # Name of the experiment
-    config_path: './configs/experiments/exp1_cora.yaml' # Path to the experiment configuration file
+### Example: Running All Experiments
+
+To run all experiments defined in `configs/config.yaml`, use:
+
+```bash
+make run_experiments ARGS="--all"
 ```
 
-### Experiment configuration file
-The experiment configuration file is a yaml file that defines the experiment. An example can be seen below:
+This will execute all configured experiments sequentially.
+
+
+
+
+### ⚙️ Experiment Configuration
+
+Each experiment is defined in a YAML configuration file located in `configs/experiments/`and referenced in `configs/config.yaml`. These configurations specify which dataset, models, and hyperparameters to use for training.
+### 📁 Structure of an Experiment Config File
+
+A typical experiment configuration file (.yaml) includes:
+
 ```yaml
-dataset_path: './data/adj_matrices/Cora.pt' # Path to the dataset
-model_types: ['L2', 'PCA']
-loss_types: ['poisson', 'hinge', 'logistic'] # Which models to run
-num_epochs: 50_000 # Number of epochs to run
-model_init: 'random' # Model initialization, random or svd
-lr: 0.1 # Learning rate
-early_stop_patience: 500 # Early stopping patience, if no improvement in loss after this number of consecutive epochs, stop
-rank_range: # Range of ranks to make binary search over
-  min: 1 # Minimum rank
-  max: 50 # Maximum rank
+dataset_path: './data/adj_matrices/Cora.pt'  # Path to the dataset
+dataset_ref: 'PyTorch-Geometric/Planetoid/Cora'  # Reference to dataset source
+model_types: ['L2', 'PCA']  # Models to train
+loss_types: ['poisson', 'hinge', 'logistic']  # Loss functions to apply
+num_epochs: 30_000  # Total number of epochs
+model_init: 'random'  # Model initialization ('random' or 'svd')
+lr: 1.0  # Learning rate
+early_stop_patience: 200  # Stop training if no improvement for this many epochs
+rank_range:  # Rank search space for finding the lowest embedding dimension
+  min: 1  # Minimum rank
+  max: 64  # Maximum rank
 ```
+
+All the config parameters are described below
+
+| Parameter            | Description |
+|----------------------|------------|
+| `dataset_path`      | Path to the dataset adjacency matrix file. |
+| `dataset_ref`       | Reference to the dataset source (e.g., PyTorch Geometric). |
+| `model_types`       | List of models to train (`L2`, `PCA`, `Hyperbolic` , `LatentEigen`, etc.). |
+| `loss_types`        | List of loss functions (`poisson`, `hinge`, `logistic`). |
+| `num_epochs`        | Number of training epochs. |
+| `model_init`        | Model initialization method (`random` or `svd`). |
+| `lr`               | Learning rate for optimization. |
+| `early_stop_patience` | Stop training if loss doesn't improve for this many epochs. |
+| `rank_range`        | Search range for rank selection (used in binary search). |
