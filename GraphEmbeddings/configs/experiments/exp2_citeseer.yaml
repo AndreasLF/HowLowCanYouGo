@@ -1,0 +1,13 @@
+dataset_path: './data/adj_matrices/Citeseer.pt'
+dataset_ref: 'PyTorch-Geometric/Planetoid/Citeseer'
+model_types: ['L2', 'PCA']
+loss_types: ['poisson', 'hinge', 'logistic']
+num_epochs: 30_000
+batching_type: 'random'
+batch_size_percentage: 0.1
+model_init: 'random'
+lr: 1.0
+early_stop_patience: 500 # Number of consecutive epochs without improvement after which early stopping will be applied
+rank_range:
+  min: 1
+  max: 50

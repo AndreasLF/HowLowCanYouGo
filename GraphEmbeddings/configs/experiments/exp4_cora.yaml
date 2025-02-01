@@ -1,0 +1,11 @@
+dataset_path: './data/adj_matrices/Cora.pt'
+dataset_ref: 'PyTorch-Geometric/Planetoid/Cora'
+model_types: ['Hyperbolic', 'L2']
+loss_types: ['hinge']
+num_epochs: 30_000
+model_init: 'random'
+lr: 1.0
+early_stop_patience: 200
+rank_range:
+  min: 1
+  max: 80

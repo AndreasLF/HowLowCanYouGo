@@ -1,0 +1,124 @@
+experiments:
+  - name: Cora1
+    config_path: './configs/experiments/exp1_cora.yaml'
+  - name: Cora2
+    config_path: './configs/experiments/exp2_cora.yaml'
+  - name: Cora3
+    config_path: './configs/experiments/exp3_cora.yaml'
+  - name: Cora4
+    config_path: './configs/experiments/exp4_cora.yaml'
+  - name: Cora5
+    config_path: './configs/experiments/exp5_cora.yaml'
+  - name: Citeseer1
+    config_path: './configs/experiments/exp1_citeseer.yaml'
+  - name: Citeseer2
+    config_path: './configs/experiments/exp2_citeseer.yaml'
+  - name: Citeseer4
+    config_path: './configs/experiments/exp4_citeseer.yaml'
+  - name: Citeseer5
+    config_path: './configs/experiments/exp5_citeseer.yaml'
+  - name: Pubmed1
+    config_path: './configs/experiments/exp1_pubmed.yaml'
+  - name: Pubmed2
+    config_path: './configs/experiments/exp2_pubmed.yaml'
+  - name: Pubmed4
+    config_path: './configs/experiments/exp4_pubmed.yaml'
+  - name: Pubmed5
+    config_path: './configs/experiments/exp5_pubmed.yaml'
+  - name: Facebook1
+    config_path: './configs/experiments/exp1_facebook.yaml'
+  - name: Facebook2
+    config_path: './configs/experiments/exp2_facebook.yaml'
+  - name: Facebook4
+    config_path: './configs/experiments/exp4_facebook.yaml'
+  - name: Facebook5
+    config_path: './configs/experiments/exp5_facebook.yaml'
+  - name: ca-HepPh1
+    config_path: './configs/experiments/exp1_ca-hepph.yaml'
+  - name: ca-HepPh2
+    config_path: './configs/experiments/exp2_ca-hepph.yaml'
+  - name: ca-HepPh4
+    config_path: './configs/experiments/exp4_ca-hepph.yaml'
+  - name: ca-HepPh5
+    config_path: './configs/experiments/exp5_ca-hepph.yaml'
+  - name: p2p-Gnutella041
+    config_path: './configs/experiments/exp1_p2p-gnutella04.yaml'
+  - name: p2p-Gnutella042
+    config_path: './configs/experiments/exp2_p2p-gnutella04.yaml'
+  - name: p2p-Gnutella044
+    config_path: './configs/experiments/exp4_p2p-gnutella04.yaml'
+  - name: p2p-Gnutella045
+    config_path: './configs/experiments/exp5_p2p-gnutella04.yaml'
+  - name: Wiki-Vote1
+    config_path: './configs/experiments/exp1_wiki-vote.yaml'
+  - name: Wiki-Vote2
+    config_path: './configs/experiments/exp2_wiki-vote.yaml'
+  - name: Wiki-Vote4
+    config_path: './configs/experiments/exp4_wiki-vote.yaml'
+  - name: Wiki-Vote5
+    config_path: './configs/experiments/exp5_wiki-vote.yaml'
+  - name: ca-GrQc1
+    config_path: './configs/experiments/exp1_ca-grqc.yaml'
+  - name: ca-GrQc2
+    config_path: './configs/experiments/exp2_ca-grqc.yaml'
+  - name: ca-GrQc4
+    config_path: './configs/experiments/exp4_ca-grqc.yaml'
+  - name: ca-GrQc5
+    config_path: './configs/experiments/exp5_ca-grqc.yaml'
+  - name: email-Enron1
+    config_path: './configs/experiments/exp1_email-enron.yaml'
+  - name: email-Enron2
+    config_path: './configs/experiments/exp2_email-enron.yaml'
+  - name: email-Enron4
+    config_path: './configs/experiments/exp4_email-enron.yaml'
+  - name: email-Enron5
+    config_path: './configs/experiments/exp5_email-enron.yaml'
+  # Add more experiments as needed
+  - name: soc-Slashdot08112
+    config_path: './configs/experiments/exp2_soc-slashdot-0811.yaml'
+  - name: soc-Slashdot08114
+    config_path: './configs/experiments/exp4_soc-slashdot-0811.yaml'
+  - name: syn-hyp-2
+    config_path: './configs/experiments/exp4_syn-hyp-2.yaml'
+  - name: syn-hyp-3
+    config_path: './configs/experiments/exp4_syn-hyp-3.yaml'
+  - name: syn-hyp-8
+    config_path: './configs/experiments/exp4_syn-hyp-8.yaml'
+  - name: syn-euc-2
+    config_path: './configs/experiments/exp4_syn-euc-2.yaml'
+  - name: syn-euc-3
+    config_path: './configs/experiments/exp4_syn-euc-3.yaml'
+  - name: syn-euc-8
+    config_path: './configs/experiments/exp4_syn-euc-8.yaml'
+  - name: erdos-renyi
+    config_path: './configs/experiments/exp4_erdos-renyi.yaml'
+data:
+  raw_path: ./data/raw
+  adj_matrices_path: ./data/adj_matrices
+  dataset_src:
+    Cora: PyTorch-Geometric/Planetoid/Cora
+    Pubmed: PyTorch-Geometric/Planetoid/PubMed # This is not the same as in Chanpuriya et al. Slight differences in the number of nodes
+    Citeseer: PyTorch-Geometric/Planetoid/CiteSeer
+    Facebook: Pytorch-Geometric/AttributedGraphDataset/Facebook
+    ca-HepPh: SNAPDataset/ca-HepPh # This seems to not have the same amount of nodes as in Chanpuriya et al. although they cited the same source
+    p2p-Gnutella04: SNAPDataset/p2p-Gnutella04
+    BlogCatalog: http://leitang.net/code/social-dimension/data/blogcatalog.mat
+    Wiki-Vote: SNAPDataset/wiki-Vote
+    ca-GrQc: SNAPDataset/ca-GrQc
+    email-Enron: SNAPDataset/email-Enron
+    # Wikipedia:
+    # PPI:
+    toy-data-6: generate-toy-data/6 # This is a toy dataset, /20 means 20 triangles
+    syn-euc-2: Euclidean_dimension_2.txt
+    syn-euc-3: Euclidean_dimension_3.txt
+    syn-euc-8: Euclidean_dimension_8.txt
+    syn-hyp-2: Hyperbolic_dimension_2.txt
+    syn-hyp-3: Hyperbolic_dimension_3.txt
+    syn-hyp-8: Hyperbolic_dimension_8.txt
+    erdos-renyi: erdos-renyi
+results:
+  path: ./results
+  logs_path: ./results/logs
+  models_path: ./results/models
+  plots_path: ./results/plots
+  stats_path: ./results/stats

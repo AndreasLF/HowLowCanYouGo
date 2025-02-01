@@ -1,0 +1,11 @@
+dataset_path: './data/adj_matrices/ca-HepPh.pt'
+dataset_ref: 'SNAPDataset/ca-HepPh'
+model_types: ['L2']
+loss_types: ['hinge']
+num_epochs: 30_000
+model_init: 'random'
+lr: 1.0
+early_stop_patience: 200
+rank_range:
+  min: 1
+  max: 80

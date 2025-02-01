@@ -1,0 +1,14 @@
+dataset_ref: 'SNAPDataset/soc-Slashdot0811'
+model_types: ['L2', 'PCA']
+loss_types: ['poisson', 'hinge', 'logistic']
+num_epochs: 20_000
+model_init: 'random'
+batch_size_percentage: 0.1
+batching_type: 'random'
+recons_check: neigh
+eval_recon_freq: 500
+lr: 1.0
+early_stop_patience: 250
+rank_range:
+  min: 1
+  max: 100

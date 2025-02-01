@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "graph_embeddings"
+version = "0.0.1"
+authors = [
+  { name="Andreas Fiehn", email="s204124@dtu.dk" },
+  { name="Niels Raunkjær Holm", email="s204503@dtu.dk"}
+]
+description = "Special course "
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/AndreasLF/GraphEmbeddings"
+Issues = "https://github.com/AndreasLF/GraphEmbeddings/issues"
+
+[tool.setuptools]
+packages = ["graph_embeddings"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.ruff]
+line-length = 120
