@@ -13,10 +13,15 @@ The code is split into two main folders as it was originally developed in two re
 
 ### 📁 [GraphEmbeddings/](GraphEmbeddings)  
 
-- Logarithmic search for EED (Algorithm 1).  
-- Metric-based node embeddings.  
-- Experiments on smaller datasets from [SNAP](https://snap.stanford.edu/data/) and [PyG](https://www.pyg.org/).  
-- Results presented in Table 2.  
+- **Logarithmic search for EED** (Algorithm 1).  
+- **Metric-based node embeddings** (L2, Hyperbolic, PCA, Latent Eigen).  
+- **Custom loss functions**: Logistic, Hinge, and Poisson loss.  
+- **Experiments on [SNAP](https://snap.stanford.edu/data/) and [PyG](https://www.pyg.org/) datasets** (Cora, Citeseer, PubMed, etc.).  
+- **Batch sampling experiments**: Random node sampling vs. case-control sampling.  
+- **Results presented in Table 2**.  
+- **W&B experiment tracking and logging** for reproducibility.  
+- **HPC job submission scripts** for large-scale training.  
+
 
 ### 📁 [HBDM-for-EED-search/](HBDM-for-EED-search)  
 Implementation of the HBDM framework leveraging metric embeddings.  
