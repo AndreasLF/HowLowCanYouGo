@@ -248,7 +248,7 @@ using the SVD hot start approach (part of algorithm 1) and a random initializati
 > Some of the visualizations used data from the HBDM implementation (see [HBDM implementation](https://github.com/AndreasLF/HowLowCanYouGo/tree/master/HBDM-for-EED-search)).
 
 
-## Logging and W&B Integration
+## ✨ Logging and W&B Integration
 This project supports two types of logging:
 - JSON Logger – Stores logs locally in a structured JSON format.
  - W&B (Weights & Biases) – A powerful tool for experiment tracking, visualization, and logging.
