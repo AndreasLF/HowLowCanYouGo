@@ -236,6 +236,8 @@ Located in **`graph_embeddings/plotting/`**, the following scripts generate key 
 - **`plot_hot_n_cold.py`** – Plots the frobenisus reconstruction error throughout training 
 using the SVD hot start approach (part of algorithm 1) and a random initialization cold start.
 - **`hbdm_plots.py`** – Plots missclassified dyads for each of the ranks in the HBDM seach for EED ([HBDM implementation](https://github.com/AndreasLF/HowLowCanYouGo/tree/master/HBDM-for-EED-search)).
+- **`plot_synthetic_blocks_graph_multiple.py`** - Bar plot of mean EED for synthetic graphs with different block structure (Shown in appendix of paper). Data generated with ```graph_embeddings/synthetic_blocks_graph_multiple.py```. 
+- **`plot_synthetic_blocks_graph.py`** - Bar plot of mean EED for synthetic graph with given number of nodes and block size. Data generated with ```graph_embeddings/synthetic_blocks_graph.py```. 
 - **`plotter.py`** – Just a wrapper to apply some constistent plotting styles. Only some elements of the class is used in the plotting functions.
 
 > [!IMPORTANT]  
