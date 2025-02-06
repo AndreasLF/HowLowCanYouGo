@@ -4,7 +4,28 @@ This directory contains the implementation of the Hierarchical Block Distance Mo
 
 
 ## 🚀 Installation & Setup
-TBD
+You can set up the environment using either **virtualenv** or **conda**.
+
+Using **venv**:
+```bash
+python3.8 -m venv venv
+source venv/bin/activate  # On Linux/macOS
+venv\Scripts\activate      # On Windows
+```
+
+Or with **Conda**:
+```bash
+conda create --name graph-embeddings python=3.8
+conda activate graph-embeddings
+```
+
+Run the following to install required packages:
+```bash
+pip install -r requirements.txt
+```
+
+
+
 
 
 ## 📂 File Structure
