@@ -23,8 +23,9 @@ Run the following to install required packages:
 ```bash
 pip install -r requirements.txt
 ```
-
-
+In addition, you need to install `torch-scatter` and `torch-sparse`; please refer to their corresponding official Github repos for installation of your specific OS and CUDA versions:
+- [rusty1s/torch-scatter](https://github.com/rusty1s/pytorch_scatter) (We use 2.1.2)
+- [rusty1s/torch-sparse](https://github.com/rusty1s/pytorch_scatter) (We use 0.6.18)
 
 
 
