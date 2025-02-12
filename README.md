@@ -12,6 +12,7 @@ This repository contains code presented in the [ICLR 2025](https://iclr.cc/virtu
 The code is split into two main folders as it was originally developed in two repositories due to different dependencies and Python versions.  
 
 ### 📁 [GraphEmbeddings/](GraphEmbeddings)  
+Use exact adjacency matrices to check for reconstruction. *Not* scalable to larger graphs.
 
 - **Logarithmic search for EED** (Algorithm 1).  
 - **Metric-based node embeddings** (L2, Hyperbolic, PCA, Latent Eigen).  
@@ -25,10 +26,11 @@ The code is split into two main folders as it was originally developed in two re
 
 ### 📁 [HBDM-for-EED-search/](HBDM-for-EED-search)  
 Implementation of the HBDM framework leveraging metric embeddings.  
+Uses KD-Trees to verify exact reconstruction in a sparse manner. Scalable to larger graphs.
 
-- HBDM implementation for embedding large graphs.  
-- Results presented in Table 3.  
-- Adapted from the [HBDM framework by Nikolaos Nakis](https://github.com/Nicknakis/HBDM).  
+- **HBDM implementation** for embedding large graphs.
+- **Results presented in Table 3.**  
+- **Adapted from** the [HBDM framework by Nikolaos Nakis](https://github.com/Nicknakis/HBDM).  
 
 ## Abstract  
 
