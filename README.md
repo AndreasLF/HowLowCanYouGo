@@ -1,5 +1,9 @@
 # How Low Can You Go?
-This repository contains code presented in the [ICLR 2025](https://iclr.cc/virtual/2025/poster/29429) paper: **How Low Can You Go? Searching for the Intrinsic Dimensionality of Complex Networks Using Metric Node Embeddings** ([Link to Paper](https://arxiv.org/abs/2503.01723))  
+[![ICLR2025](https://img.shields.io/badge/ICLR-2025-blue)](https://iclr.cc/virtual/2025/poster/29429)
+[![arXiv](https://img.shields.io/badge/arXiv-2503.01723-b31b1b.svg)](https://arxiv.org/abs/2503.01723) 
+[![OpenReview](https://img.shields.io/badge/OpenReview-Paper%20&%20Reviews-green)](https://openreview.net/forum?id=V71ITh2w40)
+
+This repository contains code presented in the [ICLR 2025](https://iclr.cc/virtual/2025/poster/29429) paper: **How Low Can You Go? Searching for the Intrinsic Dimensionality of Complex Networks Using Metric Node Embeddings** 
 
 ### Authors
 - Nikolaos Nakis <a href="https://github.com/Nicknakis"><img src="https://skillicons.dev/icons?i=github" width="16"></a>  <a href="https://www.linkedin.com/in/nikolaos-nakis-67a07a147/"><img src="https://skillicons.dev/icons?i=linkedin" width="16"></a>   
@@ -43,6 +47,24 @@ For the first time, we demonstrate that even large-scale networks can be effecti
 
 Our approach highlights that the intrinsic dimensionality of networks is substantially lower than previously reported and provides a computationally efficient assessment of the exact embedding dimension also of large-scale networks. The surprisingly low dimensional representations achieved demonstrate that networks in general can be losslessly represented using very low dimensional feature spaces, which can be used to guide existing network analysis tasks from community detection and node classification to structure revealing exact network visualizations.
 
-📖 **Full Paper:** [Link to Paper (Coming Soon)](#)    
+📖 **Full Paper:** [Link to Paper](https://openreview.net/forum?id=V71ITh2w40)
+
+
+## Cite
+```
+@inproceedings{nakis2025low,
+  author       = {Nikolaos Nakis and
+                  Niels Raunkj{\ae}r Holm and
+                  Andreas Lyhne Fiehn and
+                  Morten M{\o}rup},
+  title        = {How Low Can You Go? Searching for the Intrinsic Dimensionality of
+                  Complex Networks using Metric Node Embeddings},
+  booktitle    = {The Thirteenth International Conference on Learning Representations,
+                  {ICLR} 2025, Singapore, April 24-28, 2025},
+  year         = {2025},
+  url          = {https://openreview.net/forum?id=V71ITh2w40}
+}
+```
+
 
 
